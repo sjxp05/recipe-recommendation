@@ -1,0 +1,15 @@
+.vscode/
+.agents/
+.claude/
+
+### macOS ###
+.DS_Store
+.AppleDouble
+.LSOverride
+
+### Python ###
+.venv/
+__pycache__/
+*.pyc
+
+.env
