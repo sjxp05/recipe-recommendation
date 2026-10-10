@@ -31,7 +31,7 @@ data["Ingredient"].x = encoder.encode_texts(ingredient_texts)
 
 ### 실행 방법
 
-1. Python에서 `torch`, `torch-geometric`, `sentence-transformers`를 설치
+1. Python에서 `torch`, `torch-geometric`, `sentence-transformers` 설치
     - 최소 버전: `requirements.min.txt`
     - Colab 사용 시: `requirements.colab.txt`
 
@@ -73,30 +73,41 @@ python -m unittest discover -s tests
 
 - `MAIN` 과 `SUB` 연결 동시에 저장(예시: 정답이 MAIN이면 `MAIN, 1`과 `SUB, 0`으로 각각 기록), 연결 점수는 역할별로 독립 학습
 
-`stage1_train/test` 항목은 `[recipe_a, recipe_b, label]`, `stage2_train/test` 항목은 `[recipe_id, ingredient_id, "MAIN" 또는 "SUB", label]`입니다. 라벨은 1(유효한 연결) 또는 0(검증된 부적합 연결)입니다.
+`toy_graph.json`에서 `stage1_train/test` 항목은 `[recipe_a, recipe_b, label]`, `stage2_train/test`항목은 `[recipe_id, ingredient_id, "MAIN" 또는 "SUB", label]` 형식
 
-각 단계의 학습 및 평가 대상은 메시지 전달용 edge 목록에서 제외해야 하며 로더가 이를 검사합니다.
+- 라벨 값: 1(유효한 연결) 또는 0(검증된 부적합 연결, 필요시 추가 예정)
 
-추론할 때는 두 체크포인트로 모델을 복원한 뒤 `IngredientLinkEncoder.edge_weights(data, recipe_embeddings, pairs, role)`을 호출합니다.
+#### 학습 데이터 제작 시 유의 사항
 
-- `pairs`:
+- MAIN/SUB의 실제 역할 유사도를 학습하기 위해 재료 특징(이름, 카테고리 등)과 역할별 정답 라벨 필요.
 
-    `[2, 후보 수]` 모양의 `torch.long` 텐서. 각 후보 연결의 0~1 가중치를 반환하며 MAIN과 SUB를 각각 호출해 비교 가능
+- 연결되지 않은 쌍의 예상 연결 점수를 계산하기 위한 목적이므로 연결이 없다고 해서 무조건적으로 negative로 라벨링하지 말 것
 
-`IngredientLinkEncoder.recommend_ingredients(data, recipe_embeddings, recipe_id, role, top_k, save_predicted_edges=False)`: 요청한 역할로 이미 연결된 재료를 제외하고 `(ingredient_ids, weights)`를 높은 점수 순서로 반환합니다. 따라서 MAIN 연결이 있어도 SUB 후보로 평가할 수 있습니다.
+- 학습할 때 연결을 비운 입력도 함께 사용하여 직접 연결되지 않은 Ingredient도 자신의 feature를 통해 임베딩 생성 가능
 
-- `save_predicted_edges`:
+- 학습 및 평가 대상으로 사용할 정답 라벨은 메시지 전달용 edge 목록에서 제외할 것 (+ data.py의 로더에서 검사함)
 
-    `True`: 반환할 추천 연결을 점수 계산 후 `data`에 추가, edge 속성 `edge_weight`에 가중치 기록, `is_predicted`에 예측 여부 기록
+### 추론
 
-    `False` (기본값): 그래프를 변경하지 않음
+1. SIMILAR, MAIN/SUB 체크포인트 2개로 모델 복원
+
+2. `IngredientLinkEncoder.edge_weights(data, recipe_embeddings, pairs, role)` 호출
+
+    - `pairs`:
+
+        `[2, 후보 수]` 모양의 `torch.long` 텐서. 각 후보 연결의 0~1 가중치를 반환하며 MAIN과 SUB를 각각 호출해 비교 가능
+
+3. `IngredientLinkEncoder.recommend_ingredients(data, recipe_embeddings, recipe_id, role, top_k, save_predicted_edges=False)` 호출
+
+      `role`에 해당하는 edge로 이미 연결된 재료를 제외하고 `(ingredient_ids, weights)`를 가중치 점수가 높은 순으로 반환
+
+      - `save_predicted_edges`:
+
+        `True`: 반환할 추천 연결을 점수 계산 후 `data`에 추가, edge 속성 `edge_weight`에 가중치 기록, `is_predicted`에 예측 여부 기록
+
+
+        `False` (기본값): 그래프를 변경하지 않음
 
 - 예측한 연결 점수는 다음 계산의 이웃 집계에서 제외해 자기 자신을 강화하는 문제 방지
 
-- 학습, 추론 시에는 전체 그래프를 한 번에 메모리에 올리는 방식
-
-MAIN/SUB의 실제 역할 유사도를 배우려면 재료 특징과 역할별 정답 라벨이 필요합니다.
-
-단순히 연결이 없다는 이유만으로 음성 라벨을 만들지 마세요. 없는 연결이 실제로는 아직 기록되지 않은 연결일 수 있습니다.
-
-학습할 때 연결을 비운 입력도 함께 사용해, 직접 연결되지 않은 Ingredient도 자신의 특징으로 점수를 받을 수 있게 합니다.
+- 학습, 추론 시 전체 그래프를 메모리에 올려 실행
