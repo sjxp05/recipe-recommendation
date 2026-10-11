@@ -22,7 +22,7 @@ REV_SUPPORT = ("Ingredient", "REV_SUPPORT", "Recipe")
 ROLES = {"MAIN": MAIN, "SUPPORT": SUPPORT}
 REVERSE_ROLES = {"MAIN": REV_MAIN, "SUPPORT": REV_SUPPORT}
 
-DEVICE = torch.device("cuda" if torch.is_cuda_available() else "cpu")
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 class BGETextEncoder:

@@ -64,7 +64,7 @@ python -m unittest discover -s tests
 
 \* `examples/toy_graph.json` 참고
 
-`recipe_features`, `ingredient_features`: 순서가 노드 ID인 2차원 숫자 배열 `similar_edges`: `[recipe_a, recipe_b]`
+`recipe_features`, `ingredient_features`: 순서가 노드 ID인 2차원 숫자 배열 `similar_edges`: `[recipe_a, recipe_b, weight]` (`weight`는 0(전혀 유사하지 않음)~1(완전히 유사함) 사이의 실수)
 `main_edges`, `support_edges`: `[recipe_id, ingredient_id]`
 
 - 각 edge는 두 방향 중 하나만 기록하면 실제 그래프에서는 양방향으로 연결 생성
@@ -75,7 +75,8 @@ python -m unittest discover -s tests
 
 `toy_graph.json`에서 `stage1_train/test` 항목은 `[recipe_a, recipe_b, label]`, `stage2_train/test`항목은 `[recipe_id, ingredient_id, "MAIN" 또는 "SUPPORT", label]` 형식
 
-- 라벨 값: 1(유효한 연결) 또는 0(검증된 부적합 연결, 필요시 추가 예정)
+- 1단계 유사도 라벨: 0~1 사이 실수 (예: 0.75)
+- 2단계 연결 라벨: 1(유효한 연결) 또는 0(검증된 부적합 연결, 필요시 추가 예정)
 
 #### 학습 데이터 제작 시 유의 사항
 

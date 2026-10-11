@@ -7,6 +7,7 @@ from pathlib import Path
 import torch
 from torch import Tensor
 from torch_geometric.data import HeteroData
+from torch_geometric.utils import to_undirected
 
 from src.engine import MAIN, REV_MAIN, REV_SUPPORT, SIMILAR, SUPPORT
 
@@ -33,6 +34,20 @@ def _labels(rows: list[list]) -> tuple[Tensor, Tensor]:
     )
 
 
+def _similar_edges(rows: list[list]) -> tuple[Tensor, Tensor]:
+    allowed_weights = {0.0, 0.25, 0.5, 0.75, 1.0}
+    if any(
+        len(row) != 3
+        or not _valid_label(row[2])
+        or row[2] not in allowed_weights
+        for row in rows
+    ):
+        raise ValueError("similar edge weight must be one of 0, 0.25, 0.5, 0.75, 1")
+    return _pairs([row[:2] for row in rows]), torch.tensor(
+        [row[2] for row in rows], dtype=torch.float
+    )
+
+
 def _role_labels(rows: list[list]) -> dict[str, tuple[Tensor, Tensor]]:
     if any(
         len(row) != 4 or row[2] not in ("MAIN", "SUPPORT") or not _valid_label(row[3])
@@ -53,7 +68,9 @@ def load_dataset(path: str | Path) -> tuple[HeteroData, dict]:
     data = HeteroData()
     data["Recipe"].x = torch.tensor(raw["recipe_features"], dtype=torch.float)
     data["Ingredient"].x = torch.tensor(raw["ingredient_features"], dtype=torch.float)
-    data[SIMILAR].edge_index = _pairs(raw["similar_edges"])
+    data[SIMILAR].edge_index, data[SIMILAR].edge_weight = _similar_edges(
+        raw["similar_edges"]
+    )
     data[MAIN].edge_index = _pairs(raw["main_edges"])
     data[SUPPORT].edge_index = _pairs(raw["support_edges"])
     data[REV_MAIN].edge_index = data[MAIN].edge_index.flip(0)
@@ -77,9 +94,11 @@ def load_dataset(path: str | Path) -> tuple[HeteroData, dict]:
             raise ValueError(f"out-of-range graph edge in {edge_type[1]}")
 
     # 1차에서 고정한 SIMILAR는 무방향 연결이므로 JSON에 한 번만 적혀있는 것을 양방향으로 확장
-    similar = data[SIMILAR].edge_index
-    data[SIMILAR].edge_index = torch.cat((similar, similar.flip(0)), dim=1).unique(
-        dim=1
+    data[SIMILAR].edge_index, data[SIMILAR].edge_weight = to_undirected(
+        data[SIMILAR].edge_index,
+        data[SIMILAR].edge_weight,
+        num_nodes=data["Recipe"].num_nodes,
+        reduce="mean",
     )
 
     context = {

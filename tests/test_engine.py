@@ -5,7 +5,7 @@ import unittest
 
 import torch
 
-from src.engine import IngredientLinkEncoder, RecipeEncoder
+from src.engine import SIMILAR, IngredientLinkEncoder, RecipeEncoder
 from training.data import load_dataset
 from training.train import train_stage1, train_stage2
 
@@ -32,8 +32,8 @@ class EngineTests(unittest.TestCase):
             recipe_scores = recipes.score(recipe_embeddings, recipe_pairs)
 
             self.assertGreater(
-                recipe_scores[recipe_labels.bool()].min().item(),
-                recipe_scores[~recipe_labels.bool()].max().item(),
+                recipe_scores[recipe_labels >= 0.5].min().item(),
+                recipe_scores[recipe_labels <= 0.25].max().item(),
             )
 
             for role, (pairs, labels) in targets["test"]["ingredient"].items():
@@ -87,6 +87,22 @@ class EngineTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "message-passing graph"):
                 load_dataset(path)
 
+    def test_similar_edge_weights_and_continuous_labels(self):
+        data, targets = load_dataset(EXAMPLE)
+        edge_weights = {
+            tuple(pair): weight
+            for pair, weight in zip(
+                data[SIMILAR].edge_index.t().tolist(),
+                data[SIMILAR].edge_weight.tolist(),
+            )
+        }
+        self.assertEqual(
+            edge_weights,
+            {(0, 1): 1.0, (1, 0): 1.0, (3, 4): 0.75, (4, 3): 0.75},
+        )
+        _, train_labels = targets["train"]["recipe"]
+        self.assertEqual(train_labels.tolist(), [0.75, 0.5, 0.0, 0.25])
+
     def test_recommendations_exclude_existing_links(self):
         data, _ = load_dataset(EXAMPLE)
         recipes = RecipeEncoder(2, 8)
@@ -98,7 +114,7 @@ class EngineTests(unittest.TestCase):
 
         self.assertEqual(len(ids), len(weights))
         self.assertNotIn(0, ids.tolist())  # 이미 연결된 MAIN 재료
-        self.assertNotIn(4, ids.tolist())  # 이미 연결된 SUPPORT 재료
+        self.assertIn(4, ids.tolist())  # SUPPORT 연결은 MAIN 후보에서 제외하지 않음
         self.assertTrue((weights[:-1] >= weights[1:]).all().item())
 
 

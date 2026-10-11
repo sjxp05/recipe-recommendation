@@ -17,6 +17,12 @@ def accuracy(weights: torch.Tensor, labels: torch.Tensor) -> float:
     return float(((weights >= 0.5) == labels.bool()).float().mean())
 
 
+def mean_absolute_error(weights: torch.Tensor, labels: torch.Tensor) -> float:
+    if labels.numel() == 0:
+        return float("nan")
+    return float((weights - labels).abs().mean())
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--data", type=Path, default=Path("examples/toy_graph.json"))
@@ -47,7 +53,7 @@ def main() -> None:
         recipe_embeddings = recipes(data)
         pairs, labels = targets["test"]["recipe"]
         print(
-            f"stage1_test_accuracy={accuracy(recipes.score(recipe_embeddings, pairs).sigmoid(), labels):.3f}"
+            f"stage1_test_mae={mean_absolute_error(recipes.score(recipe_embeddings, pairs).sigmoid(), labels):.3f}"
         )
         for role, (pairs, labels) in targets["test"]["ingredient"].items():
             weights = ingredients.edge_weights(data, recipe_embeddings, pairs, role)
