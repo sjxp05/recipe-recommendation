@@ -8,7 +8,7 @@ from pathlib import Path
 import torch
 from torch.nn import functional as F
 
-from src.engine import MAIN, REV_MAIN, REV_SUB, SUB, IngredientLinkEncoder, RecipeEncoder
+from src.engine import MAIN, REV_MAIN, REV_SUPPORT, SUPPORT, IngredientLinkEncoder, RecipeEncoder
 from training.data import load_dataset
 
 
@@ -44,11 +44,11 @@ def train_stage2(data, targets, recipe_model, *, epochs: int = 100, lr: float = 
     # 연결된 레시피가 없는 재료도 자체 특징으로 평가할 수 있도록 연결을 비운
     # 그래프를 함께 학습한다. 정답 후보 연결은 두 그래프 모두에 포함하지 않는다.
     feature_only_data = data.clone()
-    for edge_type in (MAIN, SUB, REV_MAIN, REV_SUB):
+    for edge_type in (MAIN, SUPPORT, REV_MAIN, REV_SUPPORT):
         feature_only_data[edge_type].edge_index = data[edge_type].edge_index[:, :0]
     role_targets = targets["train"]["ingredient"]
     if any(labels.numel() == 0 for _, labels in role_targets.values()):
-        raise ValueError("stage2_train needs labeled MAIN and SUB pairs")
+        raise ValueError("stage2_train needs labeled MAIN and SUPPORT pairs")
     for _ in range(epochs):
         model.train()
         optimizer.zero_grad()

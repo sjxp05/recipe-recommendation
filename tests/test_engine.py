@@ -53,7 +53,7 @@ class EngineTests(unittest.TestCase):
         ingredients = IngredientLinkEncoder(3, 8)
         pair = torch.tensor([[0], [6]])
 
-        for role in ("MAIN", "SUB"):
+        for role in ("MAIN", "SUPPORT"):
             weight = ingredients.edge_weights(data, recipes(data), pair, role)
             self.assertEqual(weight.shape, (1,))
             self.assertTrue(torch.isfinite(weight).all().item())
@@ -98,7 +98,7 @@ class EngineTests(unittest.TestCase):
 
         self.assertEqual(len(ids), len(weights))
         self.assertNotIn(0, ids.tolist())  # 이미 연결된 MAIN 재료
-        self.assertNotIn(4, ids.tolist())  # 이미 연결된 SUB 재료
+        self.assertNotIn(4, ids.tolist())  # 이미 연결된 SUPPORT 재료
         self.assertTrue((weights[:-1] >= weights[1:]).all().item())
 
 

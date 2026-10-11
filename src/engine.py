@@ -1,7 +1,7 @@
 """레시피와 재료 사이의 연결을 평가하는 2단계 GraphSAGE 엔진
 
 Recipe-Recipe 간 연결: SIMILAR
-Recipe-Ingredient 간 연결: MAIN/SUB
+Recipe-Ingredient 간 연결: MAIN/SUPPORT
 학습 시 예측한 연결 점수는 그래프에 실제로 추가하지 X
 """
 
@@ -16,11 +16,11 @@ from sentence_transformers import SentenceTransformer
 
 SIMILAR = ("Recipe", "SIMILAR", "Recipe")
 MAIN = ("Recipe", "MAIN", "Ingredient")
-SUB = ("Recipe", "SUB", "Ingredient")
+SUPPORT = ("Recipe", "SUPPORT", "Ingredient")
 REV_MAIN = ("Ingredient", "REV_MAIN", "Recipe")
-REV_SUB = ("Ingredient", "REV_SUB", "Recipe")
-ROLES = {"MAIN": MAIN, "SUB": SUB}
-REVERSE_ROLES = {"MAIN": REV_MAIN, "SUB": REV_SUB}
+REV_SUPPORT = ("Ingredient", "REV_SUPPORT", "Recipe")
+ROLES = {"MAIN": MAIN, "SUPPORT": SUPPORT}
+REVERSE_ROLES = {"MAIN": REV_MAIN, "SUPPORT": REV_SUPPORT}
 
 DEVICE = torch.device("cuda" if torch.is_cuda_available() else "cpu")
 
@@ -112,7 +112,7 @@ class RecipeEncoder(nn.Module):
 
 
 class IngredientLinkEncoder(nn.Module):
-    # 2단계: 역할별 GraphSAGE로 레시피와 재료의 MAIN/SUB 연결 확률 계산
+    # 2단계: 역할별 GraphSAGE로 레시피와 재료의 MAIN/SUPPORT 연결 확률 계산
 
     """
     1단계 인코더에서 고정된 레시피 임베딩 사용

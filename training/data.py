@@ -8,7 +8,7 @@ import torch
 from torch import Tensor
 from torch_geometric.data import HeteroData
 
-from src.engine import MAIN, REV_MAIN, REV_SUB, SIMILAR, SUB
+from src.engine import MAIN, REV_MAIN, REV_SUPPORT, SIMILAR, SUPPORT
 
 
 def _valid_label(value) -> bool:
@@ -35,7 +35,7 @@ def _labels(rows: list[list]) -> tuple[Tensor, Tensor]:
 
 def _role_labels(rows: list[list]) -> dict[str, tuple[Tensor, Tensor]]:
     if any(
-        len(row) != 4 or row[2] not in ("MAIN", "SUB") or not _valid_label(row[3])
+        len(row) != 4 or row[2] not in ("MAIN", "SUPPORT") or not _valid_label(row[3])
         for row in rows
     ):
         raise ValueError("ingredient label must be a number between 0 and 1")
@@ -44,7 +44,7 @@ def _role_labels(rows: list[list]) -> dict[str, tuple[Tensor, Tensor]]:
             _pairs([row[:2] for row in rows if row[2] == role]),
             torch.tensor([row[3] for row in rows if row[2] == role], dtype=torch.float),
         )
-        for role in ("MAIN", "SUB")
+        for role in ("MAIN", "SUPPORT")
     }
 
 
@@ -55,9 +55,9 @@ def load_dataset(path: str | Path) -> tuple[HeteroData, dict]:
     data["Ingredient"].x = torch.tensor(raw["ingredient_features"], dtype=torch.float)
     data[SIMILAR].edge_index = _pairs(raw["similar_edges"])
     data[MAIN].edge_index = _pairs(raw["main_edges"])
-    data[SUB].edge_index = _pairs(raw["sub_edges"])
+    data[SUPPORT].edge_index = _pairs(raw["support_edges"])
     data[REV_MAIN].edge_index = data[MAIN].edge_index.flip(0)
-    data[REV_SUB].edge_index = data[SUB].edge_index.flip(0)
+    data[REV_SUPPORT].edge_index = data[SUPPORT].edge_index.flip(0)
 
     if data["Recipe"].x.ndim != 2 or data["Ingredient"].x.ndim != 2:
         raise ValueError("node features must be 2D arrays")
@@ -66,7 +66,7 @@ def load_dataset(path: str | Path) -> tuple[HeteroData, dict]:
         or not torch.isfinite(data["Ingredient"].x).all()
     ):
         raise ValueError("node features must be finite")
-    for edge_type in (SIMILAR, MAIN, SUB):
+    for edge_type in (SIMILAR, MAIN, SUPPORT):
         edges = data[edge_type].edge_index
         destination_count = data[edge_type[2]].num_nodes
         if edges.numel() and (
@@ -84,7 +84,7 @@ def load_dataset(path: str | Path) -> tuple[HeteroData, dict]:
 
     context = {
         role: set(map(tuple, data[edge_type].edge_index.t().tolist()))
-        for role, edge_type in (("MAIN", MAIN), ("SUB", SUB))
+        for role, edge_type in (("MAIN", MAIN), ("SUPPORT", SUPPORT))
     }
     similar_context = set(map(tuple, data[SIMILAR].edge_index.t().tolist()))
 
