@@ -109,3 +109,26 @@ python -m unittest discover -s tests
 - 예측한 연결 점수는 다음 계산의 이웃 집계에서 제외해 자기 자신을 강화하는 문제 방지
 
 - 학습, 추론 시 전체 그래프를 메모리에 올려 실행
+
+---
+
+## CSV 파일로 1단계 레시피 유사도 학습
+
+`data/recipes_masked.csv`의 전체 고유 레시피를 노드로 만들고, `data/labeled_pairs.csv`의 0~4점 평가를 0~1 라벨로 변환한다. 레시피 ID가 중복되면 첫 번째 행을 사용한다. BGE 입력 텍스트는 레시피 이름과 전체 조리 단계(`steps`)로 구성한다.
+
+```bash
+pip install -r requirements.min.txt
+python -m training.stage1_csv prepare
+python -m training.stage1_csv train
+python -m training.stage1_csv evaluate
+python -m training.stage1_csv predict --a-id 172520 --b-id 306863
+```
+
+- `prepare`: BGE 모델을 처음 사용할 때 다운로드, 인코딩 결과와 점수별 비율을 유지하면서 나눈 train/val/test 쌍을 `data/stage1.pt`에 저장
+- `train`: 학습 모델 생성 (결과 파일: `checkpoints/stage1_csv.pt`)
+- `evaluate`: 생성한 모델 검증/테스트, 유사도 2점 이상을 positive로 간주하여 정확도 계산
+- `predict`: 입력 그래프에 직접 연결되지 않은 두 레시피도 0~1 유사도로 평가
+
+`similarity >= 1`인 **학습 쌍**만 `SIMILAR` 메시지 전달용 연결로 사용한다. 0점 쌍도 낮은 유사도를 학습하는 정답으로 사용한다.
+
+학습 중에는 5개 폴드를 번갈아 예측하며, 현재 예측하는 폴드의 연결을 그래프에서 제외한다. 검증·테스트 쌍은 연결로 사용하지 않는다.
