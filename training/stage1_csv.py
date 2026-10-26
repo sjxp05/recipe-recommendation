@@ -396,7 +396,7 @@ def main() -> None:
         "--recipes", type=Path, default=Path("data/recipes_masked.csv")
     )
     prepare_parser.add_argument(
-        "--pairs", type=Path, default=Path("data/labeled_pairs.csv")
+        "--pairs", type=Path, default=Path("data/labeled_pairs_masked.csv")
     )
     prepare_parser.add_argument("--output", type=Path, default=Path("data/stage1.pt"))
     prepare_parser.add_argument("--batch-size", type=int, default=32)
