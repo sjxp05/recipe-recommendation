@@ -1,3 +1,4 @@
+import csv
 import json
 from argparse import Namespace
 from pathlib import Path
@@ -6,10 +7,27 @@ import unittest
 
 import torch
 
-from training.stage1_csv import _context_edges, _fold_context, export_json, recipe_text, score_metrics, split_pairs, unique_recipes
+from training.stage1_csv import _context_edges, _fold_context, _write_prediction_rows, export_json, recipe_text, score_metrics, split_pairs, unique_recipes
 
 
 class Stage1CsvTests(unittest.TestCase):
+    def test_prediction_csv_uses_recipe_ids_and_five_point_scores(self):
+        with TemporaryDirectory() as directory:
+            output = Path(directory) / "predictions.csv"
+            with output.open("w", encoding="utf-8", newline="") as handle:
+                writer = csv.writer(handle)
+                writer.writerow(("a_id", "b_id", "similarity", "predicted_similarity"))
+                _write_prediction_rows(
+                    writer, ["recipe-A", "recipe-B", "recipe-C"],
+                    [(2, 0, 4), (1, 2, 0)], torch.tensor([0.75, 0.125]),
+                )
+            with output.open(encoding="utf-8", newline="") as handle:
+                rows = list(csv.DictReader(handle))
+            self.assertEqual(rows, [
+                {"a_id": "recipe-C", "b_id": "recipe-A", "similarity": "4", "predicted_similarity": "3"},
+                {"a_id": "recipe-B", "b_id": "recipe-C", "similarity": "0", "predicted_similarity": "0"},
+            ])
+
     def test_score_metrics_use_original_five_point_scale(self):
         # 0~4점 반올림과 항상 0점 기준선 검사
         labels = torch.tensor([0.0, 0.25, 0.5, 0.75, 1.0])

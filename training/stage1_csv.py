@@ -314,6 +314,17 @@ def score_metrics(predictions: torch.Tensor, labels: torch.Tensor) -> dict:
     }
 
 
+def _write_prediction_rows(
+    writer: csv.writer,
+    recipe_ids: list[str],
+    rows: list[tuple[int, int, int]],
+    predictions: torch.Tensor,
+) -> None:
+    predicted_scores = (predictions * 4).round().long().clamp(0, 4).tolist()
+    for (a, b, score), predicted_score in zip(rows, predicted_scores, strict=True):
+        writer.writerow((recipe_ids[a], recipe_ids[b], score, predicted_score))
+
+
 def evaluate(args: argparse.Namespace) -> None:
     from src.engine import RecipeEncoder
 
@@ -331,14 +342,18 @@ def evaluate(args: argparse.Namespace) -> None:
     # 입력 그래프에서 검증·테스트 연결 제외
     # 직접 연결되지 않은 쌍도 레시피별 텍스트 특징으로 점수 계산
     data = _graph(features, artifact["splits"]["train"])
+    args.output.parent.mkdir(parents=True, exist_ok=True)
     print("판정 기준: 예측 유사도 × 4를 반올림해 0~4점으로 변환, 2점 이상은 유사 쌍")
-    with torch.no_grad():
+    with torch.no_grad(), args.output.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.writer(handle)
+        writer.writerow(("a_id", "b_id", "similarity", "predicted_similarity"))
         embeddings = model(data)
         for split_name in ("val", "test"):
             rows = artifact["splits"][split_name]
             pairs, labels = _pairs_and_labels(rows)
             predictions = model.score(embeddings, pairs).sigmoid()
             metrics = score_metrics(predictions, labels)
+            _write_prediction_rows(writer, artifact["recipe_ids"], rows, predictions)
             print(f"{split_name}: n={len(rows)}")
             print(
                 f"  점수 오차(0~4): MAE={metrics['mae_points']:.3f} "
@@ -355,6 +370,7 @@ def evaluate(args: argparse.Namespace) -> None:
             print("  혼동 행렬(행=실제 점수, 열=예측 점수(0~4)):")
             for score, counts in enumerate(metrics["confusion"]):
                 print(f"    {score}: {counts}")
+    print(f"predictions={args.output}")
 
 
 def predict(args: argparse.Namespace) -> None:
@@ -423,6 +439,9 @@ def main() -> None:
     eval_parser.add_argument("--data", type=Path, default=Path("data/stage1.pt"))
     eval_parser.add_argument(
         "--checkpoint", type=Path, default=Path("checkpoints/stage1_csv.pt")
+    )
+    eval_parser.add_argument(
+        "--output", type=Path, default=Path("data/stage1_csv_predictions.csv")
     )
 
     predict_parser = subcommands.add_parser("predict")
