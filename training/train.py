@@ -8,14 +8,7 @@ from pathlib import Path
 import torch
 from torch.nn import functional as F
 
-from src.engine import (
-    MAIN,
-    REV_MAIN,
-    REV_SUPPORT,
-    SUPPORT,
-    IngredientLinkEncoder,
-    RecipeEncoder,
-)
+from src.engine import CONTRIBUTION, REV_CONTRIBUTION, IngredientLinkEncoder, RecipeEncoder
 from training.data import load_dataset
 
 
@@ -52,28 +45,19 @@ def train_stage2(data, targets, recipe_model, *, epochs: int = 100, lr: float = 
     # 연결된 레시피가 없는 재료도 자체 특징으로 평가할 수 있도록 연결을 비운 feature_only 그래프를 함께 학습
     # 정답 연결은 두 그래프 모두 미포함
     feature_only_data = data.clone()
-    for edge_type in (MAIN, SUPPORT, REV_MAIN, REV_SUPPORT):
+    for edge_type in (CONTRIBUTION, REV_CONTRIBUTION):
         feature_only_data[edge_type].edge_index = data[edge_type].edge_index[:, :0]
-    role_targets = targets["train"]["ingredient"]
-    if any(labels.numel() == 0 for _, labels in role_targets.values()):
-        raise ValueError("stage2_train needs labeled MAIN and SUPPORT pairs")
+        feature_only_data[edge_type].edge_weight = data[edge_type].edge_weight[:0]
+    pairs, labels = targets["train"]["ingredient"]
+    if labels.numel() == 0:
+        raise ValueError("stage2_train needs labeled contribution pairs")
 
     for _ in range(epochs):
         model.train()
         optimizer.zero_grad()
-        context_losses = [
-            F.binary_cross_entropy_with_logits(
-                model.score(data, recipe_embeddings, pairs, role), labels
-            )
-            for role, (pairs, labels) in role_targets.items()
-        ]
-        feature_losses = [
-            F.binary_cross_entropy_with_logits(
-                model.score(feature_only_data, recipe_embeddings, pairs, role), labels
-            )
-            for role, (pairs, labels) in role_targets.items()
-        ]
-        loss = torch.stack(context_losses + feature_losses).mean()
+        context_loss = F.mse_loss(model.score(data, recipe_embeddings, pairs).sigmoid(), labels)
+        feature_loss = F.mse_loss(model.score(feature_only_data, recipe_embeddings, pairs).sigmoid(), labels)
+        loss = (context_loss + feature_loss) / 2
         loss.backward()
         optimizer.step()
 

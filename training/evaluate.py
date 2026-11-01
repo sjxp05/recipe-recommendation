@@ -11,12 +11,6 @@ from src.engine import IngredientLinkEncoder, RecipeEncoder
 from training.data import load_dataset
 
 
-def accuracy(weights: torch.Tensor, labels: torch.Tensor) -> float:
-    if labels.numel() == 0:
-        return float("nan")
-    return float(((weights >= 0.5) == labels.bool()).float().mean())
-
-
 def mean_absolute_error(weights: torch.Tensor, labels: torch.Tensor) -> float:
     if labels.numel() == 0:
         return float("nan")
@@ -55,17 +49,13 @@ def main() -> None:
         print(
             f"stage1_test_mae={mean_absolute_error(recipes.score(recipe_embeddings, pairs).sigmoid(), labels):.3f}"
         )
-        for role, (pairs, labels) in targets["test"]["ingredient"].items():
-            weights = ingredients.edge_weights(data, recipe_embeddings, pairs, role)
-            print(
-                f"stage2_{role.lower()}_test_accuracy={accuracy(weights, labels):.3f}"
-            )
-            for (recipe, ingredient), weight in zip(
-                pairs.t().tolist(), weights.tolist()
-            ):
-                print(
-                    f"  Recipe {recipe} -> Ingredient {ingredient} [{role}]: weight={weight:.3f}"
-                )
+        pairs, labels = targets["test"]["ingredient"]
+        weights = ingredients.edge_weights(data, recipe_embeddings, pairs)
+        print(f"stage2_contribution_test_mae={mean_absolute_error(weights, labels):.3f}")
+        for (recipe, ingredient), label, weight in zip(
+            pairs.t().tolist(), labels.tolist(), weights.tolist()
+        ):
+            print(f"  Recipe {recipe} -> Ingredient {ingredient}: contribution={weight:.3f} target={label:.3f}")
 
 
 if __name__ == "__main__":
