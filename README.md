@@ -121,12 +121,14 @@ python -m training.stage1_csv prepare
 python -m training.stage1_csv train
 python -m training.stage1_csv evaluate
 python -m training.stage1_csv predict --a-id 172520 --b-id 306863
+python -m training.stage1_csv top-similar --recipe-id 172520 --top-k 10
 ```
 
 - `prepare`: BGE 모델을 처음 사용할 때 다운로드, 인코딩 결과와 점수별 비율을 유지하면서 나눈 train/val/test 쌍을 `data/stage1.pt`에 저장
 - `train`: 학습 모델 생성 (결과 파일: `checkpoints/stage1_csv.pt`)
 - `evaluate`: 생성한 모델 검증/테스트, 유사도 2점 이상을 positive로 간주하여 정확도 계산. 검증·테스트 쌍의 `a_id,b_id,similarity,predicted_similarity`(정답과 예측 모두 0~4점)를 `data/stage1_csv_predictions.csv`에 저장 (`--output`으로 경로 변경 가능)
 - `predict`: 입력 그래프에 직접 연결되지 않은 두 레시피도 0~1 유사도로 평가
+- `top-similar`: 지정한 레시피를 제외하고 전체 레시피 중 유사도가 높은 상위 `--top-k`개를 원본 ID, 이름, 0~1 예측 유사도와 함께 출력. 이름은 `--recipes` CSV에서 읽어옴
 
 CSV 1단계 학습 손실과 학습 로그의 오차는 정규화된 0~1 유사도 기준의 RMSE로 계산한다. `evaluate`의 검증·테스트 오차도 같은 기준의 RMSE로 출력한다.
 

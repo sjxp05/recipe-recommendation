@@ -408,6 +408,70 @@ def predict(args: argparse.Namespace) -> None:
     )
 
 
+def rank_similar_recipes(
+    model, embeddings: torch.Tensor, recipe_index: int, top_k: int
+) -> tuple[torch.Tensor, torch.Tensor]:
+    if not 0 <= recipe_index < len(embeddings):
+        raise ValueError("recipe index is outside the graph")
+    if top_k < 1:
+        raise ValueError("top_k must be positive")
+    candidates = torch.arange(len(embeddings), device=embeddings.device)
+    candidates = candidates[candidates != recipe_index]
+    if candidates.numel() == 0:
+        return candidates, embeddings.new_empty(0)
+    pairs = torch.stack((torch.full_like(candidates, recipe_index), candidates))
+    similarities = model.score(embeddings, pairs).sigmoid()
+    values, positions = similarities.topk(min(top_k, len(candidates)))
+    return candidates[positions], values
+
+
+def top_similar(args: argparse.Namespace) -> None:
+    from src.engine import RecipeEncoder
+
+    artifact = _load_artifact(args.data)
+    recipe_ids = [str(recipe_id) for recipe_id in artifact["recipe_ids"]]
+    recipe_id = str(args.recipe_id).strip()
+    id_to_index = {value: index for index, value in enumerate(recipe_ids)}
+    if recipe_id not in id_to_index:
+        raise ValueError(f"recipe ID absent from stage1.pt: {recipe_id}")
+    if args.top_k < 1:
+        raise ValueError("top_k must be positive")
+
+    features = artifact["recipe_features"]
+    saved = torch.load(args.checkpoint, map_location="cpu", weights_only=True)
+    if (
+        saved["recipe_features"] != features.shape[1]
+        or saved["data_seed"] != artifact["seed"]
+    ):
+        raise ValueError("checkpoint does not match the feature artifact")
+    model = RecipeEncoder(features.shape[1], saved["hidden"])
+    model.load_state_dict(saved["model"])
+    model.eval()
+    data = _graph(features, artifact["splits"]["train"])
+    names = {row["id"]: row["name"] for row in unique_recipes(_read_csv(args.recipes))}
+    if recipe_id not in names:
+        raise ValueError(f"recipe ID absent from recipe CSV: {recipe_id}")
+
+    with torch.no_grad():
+        indices, similarities = rank_similar_recipes(
+            model, model(data), id_to_index[recipe_id], args.top_k
+        )
+    ranked_ids = [recipe_ids[index] for index in indices.tolist()]
+    missing_names = [
+        candidate_id for candidate_id in ranked_ids if candidate_id not in names
+    ]
+    if missing_names:
+        raise ValueError(
+            f"recipe IDs absent from recipe CSV: {', '.join(missing_names)}"
+        )
+    print(f"기준 레시피: {recipe_id} | {names[recipe_id]}")
+    print("순위\t레시피 ID\t레시피 이름\t예측 유사도(0~1)")
+    for rank, (candidate_id, similarity) in enumerate(
+        zip(ranked_ids, similarities.tolist(), strict=True), start=1
+    ):
+        print(f"{rank}\t{candidate_id}\t{names[candidate_id]}\t{similarity:.4f}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="CSV 기반 1단계 레시피 유사도 학습")
     subcommands = parser.add_subparsers(dest="command", required=True)
@@ -422,6 +486,7 @@ def main() -> None:
     prepare_parser.add_argument("--output", type=Path, default=Path("data/stage1.pt"))
     prepare_parser.add_argument("--batch-size", type=int, default=32)
     prepare_parser.add_argument("--seed", type=int, default=42)
+
     export_parser = subcommands.add_parser("export-json")
     export_parser.add_argument("--data", type=Path, default=Path("data/stage1.pt"))
     export_parser.add_argument("--output", type=Path, default=Path("data/stage1.json"))
@@ -457,11 +522,24 @@ def main() -> None:
     predict_parser.add_argument("--a-id", required=True)
     predict_parser.add_argument("--b-id", required=True)
 
+    similar_parser = subcommands.add_parser("top-similar")
+    similar_parser.add_argument("--data", type=Path, default=Path("data/stage1.pt"))
+    similar_parser.add_argument(
+        "--checkpoint", type=Path, default=Path("checkpoints/stage1_csv.pt")
+    )
+    similar_parser.add_argument(
+        "--recipes", type=Path, default=Path("data/recipes_masked.csv")
+    )
+    similar_parser.add_argument("--recipe-id", required=True)
+    similar_parser.add_argument("--top-k", type=int, default=10)
+
     args = parser.parse_args()
     if args.command == "prepare":
         prepare(args)
     elif args.command == "export-json":
         export_json(args)
+    elif args.command == "top-similar":
+        top_similar(args)
     elif args.command == "train":
         train(args)
     elif args.command == "evaluate":

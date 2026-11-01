@@ -7,10 +7,22 @@ import unittest
 
 import torch
 
-from training.stage1_csv import _context_edges, _fold_context, _write_prediction_rows, export_json, recipe_text, score_metrics, split_pairs, unique_recipes
+from training.stage1_csv import _context_edges, _fold_context, _write_prediction_rows, export_json, rank_similar_recipes, recipe_text, score_metrics, split_pairs, unique_recipes
 
 
 class Stage1CsvTests(unittest.TestCase):
+    def test_rank_similar_recipes_excludes_self_and_respects_top_k(self):
+        class Model:
+            def score(self, embeddings, pairs):
+                return torch.tensor([0.2, 0.9, 0.5, 0.7])[pairs[1]]
+
+        embeddings = torch.zeros((4, 2))
+        indices, similarities = rank_similar_recipes(Model(), embeddings, 1, 2)
+        self.assertEqual(indices.tolist(), [3, 2])
+        self.assertTrue(torch.allclose(similarities, torch.tensor([0.7, 0.5]).sigmoid()))
+        with self.assertRaisesRegex(ValueError, "top_k"):
+            rank_similar_recipes(Model(), embeddings, 1, 0)
+
     def test_prediction_csv_uses_recipe_ids_and_five_point_scores(self):
         with TemporaryDirectory() as directory:
             output = Path(directory) / "predictions.csv"
