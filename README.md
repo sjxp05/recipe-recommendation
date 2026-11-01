@@ -14,7 +14,7 @@
 
 #### 2단계
 
-`IngredientLinkEncoder`: 1단계 임베딩을 고정한 상태에서 실제로 연결된 `Recipe —MAIN/SUPPORT— Ingredient` 연결을 역할별(MAIN/SUPPORT) GraphSAGE로 집계하여 Recipe–Ingredient 후보들의 MAIN, SUPPORT 연결 확률(=edge 가중치)을 각각 학습
+`IngredientLinkEncoder`: 1단계 레시피 임베딩을 고정하고 `Recipe —CONTRIBUTION— Ingredient` 연결의 0~1 기여도를 학습한다. 기존 연결의 기여도는 양방향 이웃 집계에서 가중치로 사용한다.
 
 ```python
 from src.engine import BGETextEncoder
@@ -64,23 +64,22 @@ python -m unittest discover -s tests
 
 \* `examples/toy_graph.json` 참고
 
-`recipe_features`, `ingredient_features`: 순서가 노드 ID인 2차원 숫자 배열 `similar_edges`: `[recipe_a, recipe_b, weight]` (`weight`는 0(전혀 유사하지 않음)~1(완전히 유사함) 사이의 실수)
-`main_edges`, `support_edges`: `[recipe_id, ingredient_id]`
+`recipe_features`, `ingredient_features`: 순서가 노드 ID인 2차원 숫자 배열
+
+`similar_edges`: `[recipe_a, recipe_b, weight]` (`weight`는 0(전혀 유사하지 않음)~1(완전히 유사함) 사이 실수)
+
+`contribution_edges`: `[recipe_id, ingredient_id, contribution]` (`contribution`은 0~1 사이 실수)
 
 - 각 edge는 두 방향 중 하나만 기록하면 실제 그래프에서는 양방향으로 연결 생성
 
-- MAIN과 SUPPORT는 독립된 관계로, 한 Recipe–Ingredient 쌍이 두 역할을 모두 가질 수 있음
-
-- `MAIN` 과 `SUPPORT` 연결 동시에 저장(예시: 정답이 MAIN이면 `MAIN, 1`과 `SUPPORT, 0`으로 각각 기록), 연결 점수는 역할별로 독립 학습
-
-`toy_graph.json`에서 `stage1_train/test` 항목은 `[recipe_a, recipe_b, label]`, `stage2_train/test`항목은 `[recipe_id, ingredient_id, "MAIN" 또는 "SUPPORT", label]` 형식
+`toy_graph.json`에서 `stage1_train/test` 항목은 `[recipe_a, recipe_b, label]`, `stage2_train/test` 항목은 `[recipe_id, ingredient_id, contribution]` 형식. 동일한 레시피–재료 쌍은 각 목록에 한 번만 기록
 
 - 1단계 유사도 라벨: 0~1 사이 실수 (예: 0.75)
-- 2단계 연결 라벨: 1(유효한 연결) 또는 0(검증된 부적합 연결, 필요시 추가 예정)
+- 2단계 기여도 라벨: 0~1 사이 실수 (예: 주재료 0.9, 보조 재료 0.4, 검증된 부적합 재료 0.0)
 
 #### 학습 데이터 제작 시 유의 사항
 
-- MAIN/SUPPORT의 실제 역할 유사도를 학습하기 위해 재료 특징(이름, 카테고리 등)과 역할별 정답 라벨 필요.
+- 재료 특징(이름, 카테고리 등)과 레시피–재료 쌍별 기여도 정답 라벨(<-정빈님 마스킹 결과에 포함됨) 필요.
 
 - 연결되지 않은 쌍의 예상 연결 점수를 계산하기 위한 목적이므로 연결이 없다고 해서 무조건적으로 negative로 라벨링하지 말 것
 
@@ -90,16 +89,16 @@ python -m unittest discover -s tests
 
 ### 추론
 
-1. SIMILAR, MAIN/SUPPORT 체크포인트 2개로 모델 복원
+1. 1단계(SIMILAR)와 2단계(CONTRIBUTION) 체크포인트로 모델 복원
 
-2. `IngredientLinkEncoder.edge_weights(data, recipe_embeddings, pairs, role)` 호출
+2. `IngredientLinkEncoder.edge_weights(data, recipe_embeddings, pairs)` 호출
     - `pairs`:
 
-        `[2, 후보 수]` 모양의 `torch.long` 텐서. 각 후보 연결의 0~1 가중치를 반환하며 MAIN과 SUPPORT를 각각 호출해 비교 가능
+        `[2, 후보 수]` 모양의 `torch.long` 텐서. 각 후보 연결의 예상 기여도(0~1)를 반환
 
-3. `IngredientLinkEncoder.recommend_ingredients(data, recipe_embeddings, recipe_id, role, top_k, save_predicted_edges=False)` 호출
+3. `IngredientLinkEncoder.recommend_ingredients(data, recipe_embeddings, recipe_id, top_k, save_predicted_edges=False)` 호출
 
-    `role`에 해당하는 edge로 이미 연결된 재료를 제외하고 `(ingredient_ids, weights)`를 가중치 점수가 높은 순으로 반환
+    이미 연결된 재료를 제외하고 `(ingredient_ids, weights)`를 예상 기여도가 높은 순으로 반환
     - `save_predicted_edges`:
 
         `True`: 반환할 추천 연결을 점수 계산 후 `data`에 추가, edge 속성 `edge_weight`에 가중치 기록, `is_predicted`에 예측 여부 기록
@@ -128,6 +127,8 @@ python -m training.stage1_csv predict --a-id 172520 --b-id 306863
 - `train`: 학습 모델 생성 (결과 파일: `checkpoints/stage1_csv.pt`)
 - `evaluate`: 생성한 모델 검증/테스트, 유사도 2점 이상을 positive로 간주하여 정확도 계산. 검증·테스트 쌍의 `a_id,b_id,similarity,predicted_similarity`(정답과 예측 모두 0~4점)를 `data/stage1_csv_predictions.csv`에 저장 (`--output`으로 경로 변경 가능)
 - `predict`: 입력 그래프에 직접 연결되지 않은 두 레시피도 0~1 유사도로 평가
+
+CSV 1단계 학습 손실과 학습 로그의 오차는 정규화된 0~1 유사도 기준의 RMSE로 계산한다. `evaluate`의 검증·테스트 오차도 같은 기준의 RMSE로 출력한다.
 
 `similarity >= 1`인 **학습 쌍**만 `SIMILAR` 메시지 전달용 연결로 사용한다. 0점 쌍도 낮은 유사도를 학습하는 정답으로 사용한다.
 

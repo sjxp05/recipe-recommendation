@@ -14,7 +14,6 @@ from collections import Counter
 from pathlib import Path
 
 import torch
-from torch.nn import functional as F
 
 
 def _read_csv(path: Path) -> list[dict[str, str]]:
@@ -241,7 +240,8 @@ def train(args: argparse.Namespace) -> None:
         order = list(range(len(train_rows)))
         rng.shuffle(order)
         fold_indices = [order[i :: args.folds] for i in range(args.folds)]
-        losses = []
+        squared_error_sum = 0.0
+        prediction_count = 0
         model.train()
         for selected in fold_indices:
             if not selected:
@@ -252,12 +252,16 @@ def train(args: argparse.Namespace) -> None:
             data = _graph(features, context)
             optimizer.zero_grad()
             predictions = model.score(model(data), pairs).sigmoid()
-            loss = F.mse_loss(predictions, labels)
+            # 학습 손실과 출력 오차를 모두 정규화된 0~1 척도 RMSE로 계산
+            squared_errors = (predictions - labels).square()
+            loss = (squared_errors.mean() + 1e-8).sqrt()
             loss.backward()
             optimizer.step()
-            losses.append(float(loss.detach()))
+            squared_error_sum += float(squared_errors.detach().sum())
+            prediction_count += len(labels)
         if (epoch + 1) % max(1, args.epochs // 10) == 0:
-            print(f"epoch={epoch + 1} train_mse={sum(losses) / len(losses):.4f}")
+            train_rmse = (squared_error_sum / prediction_count) ** 0.5
+            print(f"epoch={epoch + 1} train_rmse={train_rmse:.4f}")
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
     torch.save(
@@ -282,7 +286,7 @@ def score_metrics(predictions: torch.Tensor, labels: torch.Tensor) -> dict:
 
     actual = (labels * 4).round().long().clamp(0, 4)
     predicted = (predictions * 4).round().long().clamp(0, 4)
-    errors = (predictions - labels).abs()
+    errors = predictions - labels
     exact = (predicted == actual).float().mean().item()
     within_one = ((predicted - actual).abs() <= 1).float().mean().item()
     positive_actual = actual >= 2
@@ -300,8 +304,8 @@ def score_metrics(predictions: torch.Tensor, labels: torch.Tensor) -> dict:
         for truth in range(5)
     ]
     return {
-        "mae_points": errors.mean().item() * 4,
-        "rmse_points": (errors.square().mean().sqrt().item()) * 4,
+        "mae": errors.mean().item() * 4,
+        "rmse": errors.square().mean().sqrt().item(),
         "exact_accuracy": exact,
         "within_one_accuracy": within_one,
         "zero_baseline_exact": (actual == 0).float().mean().item(),
@@ -343,7 +347,7 @@ def evaluate(args: argparse.Namespace) -> None:
     # 직접 연결되지 않은 쌍도 레시피별 텍스트 특징으로 점수 계산
     data = _graph(features, artifact["splits"]["train"])
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    print("판정 기준: 예측 유사도 × 4를 반올림해 0~4점으로 변환, 2점 이상은 유사 쌍")
+    print("변환 기준: 예측 유사도 × 4를 반올림해 0~4점으로 변환, 2점 이상은 유사 쌍")
     with torch.no_grad(), args.output.open("w", encoding="utf-8", newline="") as handle:
         writer = csv.writer(handle)
         writer.writerow(("a_id", "b_id", "similarity", "predicted_similarity"))
@@ -356,9 +360,10 @@ def evaluate(args: argparse.Namespace) -> None:
             _write_prediction_rows(writer, artifact["recipe_ids"], rows, predictions)
             print(f"{split_name}: n={len(rows)}")
             print(
-                f"  점수 오차(0~4): MAE={metrics['mae_points']:.3f} "
-                f"RMSE={metrics['rmse_points']:.3f}"
+                f"  점수 오차(0~4 라벨 기준): MAE={metrics['mae']:.4f} "
+                f"  RMSE={metrics['rmse']*4:.4f}"
             )
+            print(f"  유사도 오차(0~1): RMSE={metrics['rmse']:.4f}")
             print(f"  정답 비율={metrics['exact_accuracy']:.1%}")
             print(f"  근접 비율(오차 1점 이내)={metrics['within_one_accuracy']:.1%}")
             print(
