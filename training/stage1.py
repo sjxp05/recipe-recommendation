@@ -88,12 +88,15 @@ def _pairs_and_labels(
     return pairs, labels
 
 
-def _context_edges(rows: list[tuple[int, int, int]]) -> torch.Tensor:
-    positive = [(a, b) for a, b, score in rows if score >= 1]
+def _context_edges(
+    rows: list[tuple[int, int, int]],
+) -> tuple[torch.Tensor, torch.Tensor]:
+    positive = [(a, b, score / 4) for a, b, score in rows if score >= 1]
     if not positive:
-        return torch.empty((2, 0), dtype=torch.long)
-    forward = torch.tensor(positive, dtype=torch.long).t().contiguous()
-    return torch.cat((forward, forward.flip(0)), dim=1)
+        return torch.empty((2, 0), dtype=torch.long), torch.empty(0)
+    forward = torch.tensor([(a, b) for a, b, _ in positive], dtype=torch.long).t()
+    weights = torch.tensor([weight for _, _, weight in positive], dtype=torch.float32)
+    return torch.cat((forward, forward.flip(0)), dim=1), weights.repeat(2)
 
 
 def _fold_context(
@@ -138,7 +141,7 @@ def _graph(features: torch.Tensor, context_rows: list[tuple[int, int, int]]):
 
     data = HeteroData()
     data["Recipe"].x = features
-    data[SIMILAR].edge_index = _context_edges(context_rows)
+    data[SIMILAR].edge_index, data[SIMILAR].edge_weight = _context_edges(context_rows)
     return data
 
 

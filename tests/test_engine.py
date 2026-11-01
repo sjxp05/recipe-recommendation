@@ -190,18 +190,23 @@ class EngineTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "contribution"):
                 load_dataset(path)
 
-    def test_neighbor_message_scales_with_contribution(self):
+    def test_neighbor_message_scales_with_edge_weight(self):
         conv = WeightedSAGEConv(2)
         with torch.no_grad():
             conv.source.weight.copy_(torch.eye(2))
             conv.target.weight.zero_()
             conv.target.bias.zero_()
-        source = torch.tensor([[1.0, 2.0]])
+        source = torch.tensor([[1.0, 2.0], [3.0, 4.0]])
         target = torch.zeros((1, 2))
-        edges = torch.tensor([[0], [0]])
-        low = conv(source, target, edges, torch.tensor([0.25]))
-        high = conv(source, target, edges, torch.tensor([1.0]))
+        edges = torch.tensor([[0, 1], [0, 0]])
+        actual = conv(source, target, edges, torch.tensor([0.25, 1.0]))
+        self.assertTrue(torch.allclose(actual, torch.tensor([[1.625, 2.25]])))
+        single_edge = edges[:, :1]
+        low = conv(source, target, single_edge, torch.tensor([0.25]))
+        high = conv(source, target, single_edge, torch.tensor([1.0]))
         self.assertTrue(torch.allclose(high, low * 4))
+        zero = conv(source, target, edges, torch.zeros(2))
+        self.assertTrue(torch.equal(zero, target))
 
 
 if __name__ == "__main__":

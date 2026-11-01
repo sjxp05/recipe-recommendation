@@ -1,6 +1,6 @@
 """레시피와 재료 사이의 연결을 평가하는 2단계 GraphSAGE 엔진
 
-Recipe-Recipe 간 연결: SIMILAR
+Recipe-Recipe 간 연결: SIMILAR(0~1 유사도)
 Recipe-Ingredient 간 연결: CONTRIBUTION (0~1 기여도)
 학습 시 예측한 연결 점수는 그래프에 추가하지 않음
 """
@@ -11,7 +11,6 @@ import torch
 from torch import Tensor, nn
 from torch.nn import functional as F
 from torch_geometric.data import HeteroData
-from torch_geometric.nn import SAGEConv
 from sentence_transformers import SentenceTransformer
 
 SIMILAR = ("Recipe", "SIMILAR", "Recipe")
@@ -85,16 +84,17 @@ class RecipeEncoder(nn.Module):
     def __init__(self, recipe_features: int, hidden: int = 32):
         super().__init__()
         self.input = nn.Linear(recipe_features, hidden)
-        self.conv1 = SAGEConv(hidden, hidden)
-        self.conv2 = SAGEConv(hidden, hidden)
+        self.conv1 = WeightedSAGEConv(hidden)
+        self.conv2 = WeightedSAGEConv(hidden)
         self.logit_scale = nn.Parameter(torch.tensor(2.0))
 
     def forward(self, data: HeteroData) -> Tensor:
         x = data["Recipe"].x
         edges = data[SIMILAR].edge_index
+        weights = data[SIMILAR].edge_weight
         x = F.relu(self.input(x))
-        x = F.relu(self.conv1(x, edges))
-        return F.normalize(self.conv2(x, edges), dim=-1)
+        x = F.relu(self.conv1(x, x, edges, weights))
+        return F.normalize(self.conv2(x, x, edges, weights), dim=-1)
 
     def score(self, recipe_embeddings: Tensor, pairs: Tensor) -> Tensor:
         _check_pairs(pairs, len(recipe_embeddings), len(recipe_embeddings))
@@ -105,8 +105,7 @@ class RecipeEncoder(nn.Module):
 
 
 class WeightedSAGEConv(nn.Module):
-    # 기여도 가중 평균으로 이웃 점수를 집계하는 이종 노드 GraphSAGE 계층
-
+    # 이웃 메시지에 엣지 가중치를 곱한 뒤 이웃 수로 나누는 GraphSAGE 계층
     def __init__(self, hidden: int):
         super().__init__()
         self.source = nn.Linear(hidden, hidden, bias=False)
@@ -116,21 +115,18 @@ class WeightedSAGEConv(nn.Module):
         self, source: Tensor, target: Tensor, edges: Tensor, weights: Tensor
     ) -> Tensor:
         neighbors = torch.zeros_like(target)
-        totals = target.new_zeros((target.shape[0], 1))
+        counts = target.new_zeros((target.shape[0], 1))
         if edges.numel():
             messages = source[edges[0]] * weights.unsqueeze(-1)
             neighbors.index_add_(0, edges[1], messages)
-            totals.index_add_(0, edges[1], torch.ones_like(weights).unsqueeze(-1))
-        return self.target(target) + self.source(neighbors / totals.clamp_min(1))
+            counts.index_add_(0, edges[1], torch.ones_like(weights).unsqueeze(-1))
+        return self.target(target) + self.source(neighbors / counts.clamp_min(1))
 
 
 class IngredientLinkEncoder(nn.Module):
     # 2단계: 단일 CONTRIBUTION 관계에서 0~1 기여도를 회귀
-
-    """
-    1단계 인코더에서 고정된 레시피 임베딩 사용
-    연결이 없는 재료도 자기 노드 경로를 통해 재료 특징으로 임베딩 생성
-    """
+    #   - 1단계 인코더에서 고정된 레시피 임베딩 사용
+    #   - 연결이 없는 재료도 자기 노드 경로를 통해 재료 특징으로 임베딩 생성
 
     def __init__(self, ingredient_features: int, hidden: int = 32):
         super().__init__()

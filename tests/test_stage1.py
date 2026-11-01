@@ -8,6 +8,7 @@ import torch
 from training.stage1 import (
     _context_edges,
     _fold_context,
+    _graph,
     _write_prediction_rows,
     rank_similar_recipes,
     recipe_text,
@@ -102,10 +103,20 @@ class Stage1CsvTests(unittest.TestCase):
             {"train": 30, "val": 10, "test": 10},
         )
 
-        context = {
-            tuple(sorted(edge)) for edge in _context_edges(splits["train"]).t().tolist()
-        }
+        context_edges, context_weights = _context_edges(splits["train"])
+        context = {tuple(sorted(edge)) for edge in context_edges.t().tolist()}
         self.assertTrue(context)
+        expected_weights = {
+            tuple(sorted((a, b))): score / 4
+            for a, b, score in splits["train"]
+            if score >= 1
+        }
+        self.assertEqual(
+            {tuple(sorted(edge)): weight for edge, weight in zip(
+                context_edges.t().tolist(), context_weights.tolist(), strict=True
+            )},
+            expected_weights,
+        )
         self.assertEqual(
             context,
             {tuple(sorted((a, b))) for a, b, score in splits["train"] if score >= 1},
@@ -117,15 +128,26 @@ class Stage1CsvTests(unittest.TestCase):
 
         # 예측 대상 학습 쌍의 직접 연결 제외 검사
         held_out = [0, 1, 2]
-        fold_edges = {
-            tuple(sorted(edge))
-            for edge in _context_edges(_fold_context(splits["train"], held_out))
-            .t()
-            .tolist()
-        }
+        fold_index, _ = _context_edges(_fold_context(splits["train"], held_out))
+        fold_edges = {tuple(sorted(edge)) for edge in fold_index.t().tolist()}
         for index in held_out:
             a, b, _ = splits["train"][index]
             self.assertNotIn(tuple(sorted((a, b))), fold_edges)
+
+    def test_recipe_encoder_uses_context_weights(self):
+        from src.engine import RecipeEncoder, SIMILAR
+
+        torch.manual_seed(11)
+        features = torch.randn(3, 4)
+        rows = [(0, 1, 1), (2, 1, 4)]
+        data = _graph(features, rows)
+        self.assertEqual(data[SIMILAR].edge_weight.tolist(), [0.25, 1.0, 0.25, 1.0])
+        model = RecipeEncoder(4, 8)
+        with torch.no_grad():
+            weighted = model(data)
+            data[SIMILAR].edge_weight.fill_(1.0)
+            unweighted = model(data)
+        self.assertFalse(torch.allclose(weighted, unweighted))
 
     def test_duplicate_recipe_id_and_text(self):
         # 중복 ID의 첫 행 선택과 텍스트 구성 검사
