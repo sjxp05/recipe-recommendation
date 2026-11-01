@@ -5,7 +5,16 @@ import unittest
 
 import torch
 
-from training.stage1_csv import _context_edges, _fold_context, _write_prediction_rows, rank_similar_recipes, recipe_text, score_metrics, split_pairs, unique_recipes
+from training.stage1 import (
+    _context_edges,
+    _fold_context,
+    _write_prediction_rows,
+    rank_similar_recipes,
+    recipe_text,
+    score_metrics,
+    split_pairs,
+    unique_recipes,
+)
 
 
 class Stage1CsvTests(unittest.TestCase):
@@ -17,7 +26,9 @@ class Stage1CsvTests(unittest.TestCase):
         embeddings = torch.zeros((4, 2))
         indices, similarities = rank_similar_recipes(Model(), embeddings, 1, 2)
         self.assertEqual(indices.tolist(), [3, 2])
-        self.assertTrue(torch.allclose(similarities, torch.tensor([0.7, 0.5]).sigmoid()))
+        self.assertTrue(
+            torch.allclose(similarities, torch.tensor([0.7, 0.5]).sigmoid())
+        )
         with self.assertRaisesRegex(ValueError, "top_k"):
             rank_similar_recipes(Model(), embeddings, 1, 0)
 
@@ -28,15 +39,30 @@ class Stage1CsvTests(unittest.TestCase):
                 writer = csv.writer(handle)
                 writer.writerow(("a_id", "b_id", "similarity", "predicted_similarity"))
                 _write_prediction_rows(
-                    writer, ["recipe-A", "recipe-B", "recipe-C"],
-                    [(2, 0, 4), (1, 2, 0)], torch.tensor([0.75, 0.125]),
+                    writer,
+                    ["recipe-A", "recipe-B", "recipe-C"],
+                    [(2, 0, 4), (1, 2, 0)],
+                    torch.tensor([0.75, 0.125]),
                 )
             with output.open(encoding="utf-8", newline="") as handle:
                 rows = list(csv.DictReader(handle))
-            self.assertEqual(rows, [
-                {"a_id": "recipe-C", "b_id": "recipe-A", "similarity": "4", "predicted_similarity": "3"},
-                {"a_id": "recipe-B", "b_id": "recipe-C", "similarity": "0", "predicted_similarity": "0"},
-            ])
+            self.assertEqual(
+                rows,
+                [
+                    {
+                        "a_id": "recipe-C",
+                        "b_id": "recipe-A",
+                        "similarity": "4",
+                        "predicted_similarity": "3",
+                    },
+                    {
+                        "a_id": "recipe-B",
+                        "b_id": "recipe-C",
+                        "similarity": "0",
+                        "predicted_similarity": "0",
+                    },
+                ],
+            )
 
     def test_score_metrics_use_original_five_point_scale(self):
         # 0~4점 반올림과 항상 0점 기준선 검사
@@ -59,37 +85,57 @@ class Stage1CsvTests(unittest.TestCase):
         recipes = [{"id": str(i)} for i in range(100)]
         ids = {row["id"]: index for index, row in enumerate(recipes)}
         pairs = [
-            {"a_id": str(score * 20 + i * 2),
-             "b_id": str(score * 20 + i * 2 + 1),
-             "similarity": str(score)}
-            for score in range(5) for i in range(10)
+            {
+                "a_id": str(score * 20 + i * 2),
+                "b_id": str(score * 20 + i * 2 + 1),
+                "similarity": str(score),
+            }
+            for score in range(5)
+            for i in range(10)
         ]
         splits = split_pairs(pairs, ids, seed=42)
 
         self.assertEqual(sum(map(len, splits.values())), len(pairs))
         self.assertEqual(splits, split_pairs(pairs, ids, seed=42))
-        self.assertEqual({name: len(rows) for name, rows in splits.items()},
-                         {"train": 30, "val": 10, "test": 10})
+        self.assertEqual(
+            {name: len(rows) for name, rows in splits.items()},
+            {"train": 30, "val": 10, "test": 10},
+        )
 
-        context = {tuple(sorted(edge)) for edge in _context_edges(splits["train"]).t().tolist()}
+        context = {
+            tuple(sorted(edge)) for edge in _context_edges(splits["train"]).t().tolist()
+        }
         self.assertTrue(context)
-        self.assertEqual(context, {tuple(sorted((a, b))) for a, b, score in splits["train"] if score >= 1})
+        self.assertEqual(
+            context,
+            {tuple(sorted((a, b))) for a, b, score in splits["train"] if score >= 1},
+        )
         for name in ("val", "test"):
-            self.assertTrue(all(tuple(sorted((a, b))) not in context for a, b, _ in splits[name]))
+            self.assertTrue(
+                all(tuple(sorted((a, b))) not in context for a, b, _ in splits[name])
+            )
 
         # 예측 대상 학습 쌍의 직접 연결 제외 검사
         held_out = [0, 1, 2]
-        fold_edges = {tuple(sorted(edge)) for edge in _context_edges(
-            _fold_context(splits["train"], held_out)
-        ).t().tolist()}
+        fold_edges = {
+            tuple(sorted(edge))
+            for edge in _context_edges(_fold_context(splits["train"], held_out))
+            .t()
+            .tolist()
+        }
         for index in held_out:
             a, b, _ = splits["train"][index]
             self.assertNotIn(tuple(sorted((a, b))), fold_edges)
 
     def test_duplicate_recipe_id_and_text(self):
         # 중복 ID의 첫 행 선택과 텍스트 구성 검사
-        first = {"id": "1", "name": "soup", "ingredients": "['onion', 'water']",
-                 "steps": "['boil water']", "description": "simple soup"}
+        first = {
+            "id": "1",
+            "name": "soup",
+            "ingredients": "['onion', 'water']",
+            "steps": "['boil water']",
+            "description": "simple soup",
+        }
         second = dict(first, steps="['add onion']")
         self.assertEqual(unique_recipes([first, second]), [first])
         self.assertEqual(recipe_text(first), "Recipe: soup. Steps: boil water")
@@ -97,6 +143,7 @@ class Stage1CsvTests(unittest.TestCase):
             recipe_text(dict(first, ingredients="['carrot']", description="different")),
             recipe_text(first),
         )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -58,7 +58,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--data", type=Path, required=True)
     parser.add_argument(
-        "--stage1-checkpoint", type=Path, default=Path("checkpoints/stage1_csv.pt")
+        "--stage1-checkpoint", type=Path, default=Path("checkpoints/stage1.pt")
     )
     parser.add_argument("--output", type=Path)
     parser.add_argument("--epochs", type=int, default=100)

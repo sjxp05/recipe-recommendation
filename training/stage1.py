@@ -412,14 +412,18 @@ def main() -> None:
     prepare_parser.add_argument(
         "--pairs", type=Path, default=Path("data/labeled_pairs_masked.csv")
     )
-    prepare_parser.add_argument("--output", type=Path, default=Path("data/stage1.pt"))
+    prepare_parser.add_argument(
+        "--output", type=Path, default=Path("data/stage1_embeddings.pt")
+    )
     prepare_parser.add_argument("--batch-size", type=int, default=32)
     prepare_parser.add_argument("--seed", type=int, default=42)
 
     train_parser = subcommands.add_parser("train")
-    train_parser.add_argument("--data", type=Path, default=Path("data/stage1.pt"))
     train_parser.add_argument(
-        "--output", type=Path, default=Path("checkpoints/stage1_csv.pt")
+        "--data", type=Path, default=Path("data/stage1_embeddings.pt")
+    )
+    train_parser.add_argument(
+        "--output", type=Path, default=Path("checkpoints/stage1.pt")
     )
     train_parser.add_argument("--hidden", type=int, default=32)
     train_parser.add_argument("--epochs", type=int, default=100)
@@ -428,26 +432,32 @@ def main() -> None:
     train_parser.add_argument("--seed", type=int, default=42)
 
     eval_parser = subcommands.add_parser("evaluate")
-    eval_parser.add_argument("--data", type=Path, default=Path("data/stage1.pt"))
     eval_parser.add_argument(
-        "--checkpoint", type=Path, default=Path("checkpoints/stage1_csv.pt")
+        "--data", type=Path, default=Path("data/stage1_embeddings.pt")
     )
     eval_parser.add_argument(
-        "--output", type=Path, default=Path("data/stage1_csv_predictions.csv")
+        "--checkpoint", type=Path, default=Path("checkpoints/stage1.pt")
+    )
+    eval_parser.add_argument(
+        "--output", type=Path, default=Path("data/stage1_predictions.csv")
     )
 
     predict_parser = subcommands.add_parser("predict")
-    predict_parser.add_argument("--data", type=Path, default=Path("data/stage1.pt"))
     predict_parser.add_argument(
-        "--checkpoint", type=Path, default=Path("checkpoints/stage1_csv.pt")
+        "--data", type=Path, default=Path("data/stage1_embeddings.pt")
+    )
+    predict_parser.add_argument(
+        "--checkpoint", type=Path, default=Path("checkpoints/stage1.pt")
     )
     predict_parser.add_argument("--a-id", required=True)
     predict_parser.add_argument("--b-id", required=True)
 
     similar_parser = subcommands.add_parser("top-similar")
-    similar_parser.add_argument("--data", type=Path, default=Path("data/stage1.pt"))
     similar_parser.add_argument(
-        "--checkpoint", type=Path, default=Path("checkpoints/stage1_csv.pt")
+        "--data", type=Path, default=Path("data/stage1_embeddings.pt")
+    )
+    similar_parser.add_argument(
+        "--checkpoint", type=Path, default=Path("checkpoints/stage1.pt")
     )
     similar_parser.add_argument(
         "--recipes", type=Path, default=Path("data/recipes_masked.csv")
