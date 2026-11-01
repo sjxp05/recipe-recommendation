@@ -4,20 +4,43 @@ import json
 import unittest
 
 import torch
+from torch.nn import functional as F
 
-from src.engine import CONTRIBUTION, REV_CONTRIBUTION, SIMILAR, IngredientLinkEncoder, RecipeEncoder, WeightedSAGEConv, find_recipes_by_ingredient
+from src.engine import (
+    CONTRIBUTION,
+    REV_CONTRIBUTION,
+    SIMILAR,
+    IngredientLinkEncoder,
+    RecipeEncoder,
+    WeightedSAGEConv,
+    find_recipes_by_ingredient,
+)
 from training.data import load_dataset
-from training.train import train_stage1, train_stage2
+from training.stage2 import train
 
 EXAMPLE = Path(__file__).resolve().parents[1] / "examples" / "toy_graph.json"
+
+
+def train_toy_recipe_encoder(data):
+    # 엔진 테스트용 작은 그래프. 실제 1단계 학습은 CSV 워크플로에서 수행한다.
+    model = RecipeEncoder(2, 8)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
+    pairs = torch.tensor([[1, 4, 0, 2], [2, 5, 3, 5]])
+    labels = torch.tensor([0.75, 0.5, 0.0, 0.25])
+    for _ in range(35):
+        optimizer.zero_grad()
+        loss = F.mse_loss(model.score(model(data), pairs).sigmoid(), labels)
+        loss.backward()
+        optimizer.step()
+    return model
 
 
 class EngineTests(unittest.TestCase):
     def test_two_stages_rank_unseen_links_and_freeze_recipe_encoder(self):
         torch.manual_seed(7)
         data, targets = load_dataset(EXAMPLE)
-        recipes, _ = train_stage1(data, targets, hidden=8, epochs=35)
-        ingredients, _ = train_stage2(data, targets, recipes, epochs=35)
+        recipes = train_toy_recipe_encoder(data)
+        ingredients, _ = train(data, targets, recipes, epochs=35)
 
         self.assertTrue(
             all(not parameter.requires_grad for parameter in recipes.parameters())
@@ -28,7 +51,8 @@ class EngineTests(unittest.TestCase):
 
         with torch.no_grad():
             recipe_embeddings = recipes(data)
-            recipe_pairs, recipe_labels = targets["test"]["recipe"]
+            recipe_pairs = torch.tensor([[0, 3, 1, 2], [2, 5, 4, 3]])
+            recipe_labels = torch.tensor([0.75, 0.5, 0.0, 0.25])
             recipe_scores = recipes.score(recipe_embeddings, recipe_pairs)
 
             self.assertGreater(
@@ -39,7 +63,9 @@ class EngineTests(unittest.TestCase):
             pairs, labels = targets["test"]["ingredient"]
             weights = ingredients.edge_weights(data, recipe_embeddings, pairs)
             self.assertTrue(torch.isfinite(weights).all().item())
-            self.assertGreater(weights[labels >= 0.8].mean().item(), weights[labels == 0].mean().item())
+            self.assertGreater(
+                weights[labels >= 0.8].mean().item(), weights[labels == 0].mean().item()
+            )
 
     def test_isolated_ingredient_has_finite_contribution(self):
         data, _ = load_dataset(EXAMPLE)
@@ -61,8 +87,8 @@ class EngineTests(unittest.TestCase):
         torch.manual_seed(7)
         data, targets = load_dataset(EXAMPLE)
 
-        recipes, _ = train_stage1(data, targets, hidden=8, epochs=35)
-        ingredients, _ = train_stage2(data, targets, recipes, epochs=35)
+        recipes = train_toy_recipe_encoder(data)
+        ingredients, _ = train(data, targets, recipes, epochs=35)
         data["Ingredient"].x = torch.cat(
             (data["Ingredient"].x, data["Ingredient"].x[0:1])
         )
@@ -83,8 +109,8 @@ class EngineTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "message-passing graph"):
                 load_dataset(path)
 
-    def test_similar_edge_weights_and_continuous_labels(self):
-        data, targets = load_dataset(EXAMPLE)
+    def test_similar_edge_weights(self):
+        data, _ = load_dataset(EXAMPLE)
         edge_weights = {
             tuple(pair): weight
             for pair, weight in zip(
@@ -96,8 +122,6 @@ class EngineTests(unittest.TestCase):
             edge_weights,
             {(0, 1): 1.0, (1, 0): 1.0, (3, 4): 0.75, (4, 3): 0.75},
         )
-        _, train_labels = targets["train"]["recipe"]
-        self.assertEqual(train_labels.tolist(), [0.75, 0.5, 0.0, 0.25])
 
     def test_recommendations_exclude_existing_links(self):
         data, _ = load_dataset(EXAMPLE)
@@ -116,9 +140,22 @@ class EngineTests(unittest.TestCase):
     def test_contribution_weights_and_reverse_edges(self):
         data, targets = load_dataset(EXAMPLE)
         self.assertAlmostEqual(data[CONTRIBUTION].edge_weight.tolist()[0], 0.9)
-        self.assertTrue(torch.equal(data[REV_CONTRIBUTION].edge_index, data[CONTRIBUTION].edge_index.flip(0)))
-        self.assertTrue(torch.equal(data[REV_CONTRIBUTION].edge_weight, data[CONTRIBUTION].edge_weight))
-        self.assertTrue(torch.allclose(targets["train"]["ingredient"][1], torch.tensor([0.9, 0.9, 0.0, 0.0, 0.4, 0.4])))
+        self.assertTrue(
+            torch.equal(
+                data[REV_CONTRIBUTION].edge_index, data[CONTRIBUTION].edge_index.flip(0)
+            )
+        )
+        self.assertTrue(
+            torch.equal(
+                data[REV_CONTRIBUTION].edge_weight, data[CONTRIBUTION].edge_weight
+            )
+        )
+        self.assertTrue(
+            torch.allclose(
+                targets["train"]["ingredient"][1],
+                torch.tensor([0.9, 0.9, 0.0, 0.0, 0.4, 0.4]),
+            )
+        )
         self.assertEqual(find_recipes_by_ingredient(data, 4).tolist(), [0, 3])
 
     def test_predicted_edges_keep_weights_but_do_not_change_scores(self):
@@ -128,12 +165,21 @@ class EngineTests(unittest.TestCase):
         embeddings = recipes(data)
         pair = torch.tensor([[2], [1]])
         before = ingredients.edge_weights(data, embeddings, pair)
-        ids, values = ingredients.recommend_ingredients(data, embeddings, 2, top_k=2, save_predicted_edges=True)
-        self.assertTrue(torch.equal(before, ingredients.edge_weights(data, embeddings, pair)))
+        ids, values = ingredients.recommend_ingredients(
+            data, embeddings, 2, top_k=2, save_predicted_edges=True
+        )
+        self.assertTrue(
+            torch.equal(before, ingredients.edge_weights(data, embeddings, pair))
+        )
         self.assertTrue(torch.equal(data[CONTRIBUTION].edge_weight[-2:], values))
         self.assertTrue(torch.equal(data[REV_CONTRIBUTION].edge_weight[-2:], values))
         self.assertNotIn(2, find_recipes_by_ingredient(data, int(ids[0])).tolist())
-        self.assertIn(2, find_recipes_by_ingredient(data, int(ids[0]), include_predicted=True).tolist())
+        self.assertIn(
+            2,
+            find_recipes_by_ingredient(
+                data, int(ids[0]), include_predicted=True
+            ).tolist(),
+        )
 
     def test_invalid_contribution_is_rejected(self):
         raw = json.loads(EXAMPLE.read_text(encoding="utf-8"))

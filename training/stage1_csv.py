@@ -8,7 +8,6 @@ from __future__ import annotations
 import argparse
 import ast
 import csv
-import json
 import random
 from collections import Counter
 from pathlib import Path
@@ -148,76 +147,6 @@ def _load_artifact(path: Path) -> dict:
     if not isinstance(artifact["recipe_features"], torch.Tensor):
         raise ValueError("invalid stage-1 feature artifact")
     return artifact
-
-
-def export_json(args: argparse.Namespace) -> None:
-    artifact = _load_artifact(args.data)
-    recipe_ids = artifact["recipe_ids"]
-    features = artifact["recipe_features"]
-    args.output.parent.mkdir(parents=True, exist_ok=True)
-
-    # 임베딩을 한 행씩 기록하여 전체 변환본의 메모리 중복 방지
-    with args.output.open("w", encoding="utf-8") as handle:
-        handle.write('{\n  "encoder": ')
-        json.dump(artifact["encoder"], handle, ensure_ascii=False)
-        handle.write(',\n  "seed": ')
-        json.dump(artifact["seed"], handle)
-        handle.write(',\n  "recipe_ids": ')
-        json.dump(recipe_ids, handle, ensure_ascii=False)
-        handle.write(',\n  "recipe_features": [\n')
-        for index, vector in enumerate(features):
-            if index:
-                handle.write(",\n")
-            handle.write("    ")
-            json.dump(vector.tolist(), handle, separators=(",", ":"))
-        handle.write('\n  ],\n  "splits": {\n')
-        for split_index, (name, rows) in enumerate(artifact["splits"].items()):
-            if split_index:
-                handle.write(",\n")
-            handle.write(f"    {json.dumps(name)}: [\n")
-            for index, (a, b, score) in enumerate(rows):
-                if index:
-                    handle.write(",\n")
-                handle.write("      ")
-                json.dump(
-                    {
-                        "a_id": recipe_ids[a],
-                        "b_id": recipe_ids[b],
-                        "similarity": score,
-                        "label": score / 4,
-                    },
-                    handle,
-                    ensure_ascii=False,
-                )
-            handle.write("\n    ]")
-        handle.write("\n  }\n}\n")
-    summary = {
-        "encoder": artifact["encoder"],
-        "seed": artifact["seed"],
-        "recipe_count": len(recipe_ids),
-        "feature_shape": list(features.shape),
-        "feature_dtype": str(features.dtype),
-        "splits": {
-            name: [
-                {
-                    "a_id": recipe_ids[a],
-                    "b_id": recipe_ids[b],
-                    "similarity": score,
-                    "label": score / 4,
-                }
-                for a, b, score in rows
-            ]
-            for name, rows in artifact["splits"].items()
-        },
-    }
-    args.summary_output.parent.mkdir(parents=True, exist_ok=True)
-    args.summary_output.write_text(
-        json.dumps(summary, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
-    )
-    print(f"json={args.output} size={args.output.stat().st_size:,} bytes")
-    print(
-        f"summary={args.summary_output} size={args.summary_output.stat().st_size:,} bytes"
-    )
 
 
 def train(args: argparse.Namespace) -> None:
@@ -487,13 +416,6 @@ def main() -> None:
     prepare_parser.add_argument("--batch-size", type=int, default=32)
     prepare_parser.add_argument("--seed", type=int, default=42)
 
-    export_parser = subcommands.add_parser("export-json")
-    export_parser.add_argument("--data", type=Path, default=Path("data/stage1.pt"))
-    export_parser.add_argument("--output", type=Path, default=Path("data/stage1.json"))
-    export_parser.add_argument(
-        "--summary-output", type=Path, default=Path("data/stage1_summary.json")
-    )
-
     train_parser = subcommands.add_parser("train")
     train_parser.add_argument("--data", type=Path, default=Path("data/stage1.pt"))
     train_parser.add_argument(
@@ -536,8 +458,6 @@ def main() -> None:
     args = parser.parse_args()
     if args.command == "prepare":
         prepare(args)
-    elif args.command == "export-json":
-        export_json(args)
     elif args.command == "top-similar":
         top_similar(args)
     elif args.command == "train":

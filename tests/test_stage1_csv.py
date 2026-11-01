@@ -1,13 +1,11 @@
 import csv
-import json
-from argparse import Namespace
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
 
 import torch
 
-from training.stage1_csv import _context_edges, _fold_context, _write_prediction_rows, export_json, rank_similar_recipes, recipe_text, score_metrics, split_pairs, unique_recipes
+from training.stage1_csv import _context_edges, _fold_context, _write_prediction_rows, rank_similar_recipes, recipe_text, score_metrics, split_pairs, unique_recipes
 
 
 class Stage1CsvTests(unittest.TestCase):
@@ -99,32 +97,6 @@ class Stage1CsvTests(unittest.TestCase):
             recipe_text(dict(first, ingredients="['carrot']", description="different")),
             recipe_text(first),
         )
-
-    def test_json_export_preserves_features_and_pair_ids(self):
-        # 전체 JSON의 임베딩 보존과 요약 JSON의 원본 ID 매핑 검사
-        with TemporaryDirectory() as directory:
-            root = Path(directory)
-            source = root / "stage1.pt"
-            full = root / "stage1.json"
-            summary = root / "summary.json"
-            torch.save({
-                "recipe_ids": ["10", "20"],
-                "recipe_features": torch.tensor([[0.1, 0.2], [0.3, 0.4]]),
-                "splits": {"train": [(0, 1, 4)], "val": [], "test": []},
-                "seed": 42,
-                "encoder": "example",
-            }, source)
-            export_json(Namespace(data=source, output=full, summary_output=summary))
-
-            full_data = json.loads(full.read_text(encoding="utf-8"))
-            summary_data = json.loads(summary.read_text(encoding="utf-8"))
-            self.assertEqual(full_data["recipe_features"][0][0],
-                             torch.tensor(0.1).item())
-            self.assertEqual(full_data["splits"]["train"][0],
-                             {"a_id": "10", "b_id": "20", "similarity": 4, "label": 1.0})
-            self.assertEqual(summary_data["feature_shape"], [2, 2])
-            self.assertNotIn("recipe_features", summary_data)
-
 
 if __name__ == "__main__":
     unittest.main()

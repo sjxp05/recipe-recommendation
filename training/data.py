@@ -26,14 +26,6 @@ def _pairs(rows: list[list[int]]) -> Tensor:
     return torch.tensor(rows, dtype=torch.long).t().contiguous()
 
 
-def _labels(rows: list[list]) -> tuple[Tensor, Tensor]:
-    if any(len(row) != 3 or not _valid_label(row[2]) for row in rows):
-        raise ValueError("recipe label must be a number between 0 and 1")
-    return _pairs([row[:2] for row in rows]), torch.tensor(
-        [row[2] for row in rows], dtype=torch.float
-    )
-
-
 def _similar_edges(rows: list[list]) -> tuple[Tensor, Tensor]:
     allowed_weights = {0.0, 0.25, 0.5, 0.75, 1.0}
     if any(
@@ -99,19 +91,9 @@ def load_dataset(path: str | Path) -> tuple[HeteroData, dict]:
     )
 
     context = set(map(tuple, data[CONTRIBUTION].edge_index.t().tolist()))
-    similar_context = set(map(tuple, data[SIMILAR].edge_index.t().tolist()))
-
     targets = {}
     for split in ("train", "test"):
-        recipe_pairs, recipe_labels = _labels(raw[f"stage1_{split}"])
         ingredient_pairs, ingredient_labels = _contributions(raw[f"stage2_{split}"])
-        for a, b in recipe_pairs.t().tolist():
-            if (a, b) in similar_context:
-                raise ValueError(
-                    f"stage1_{split} target appears in message-passing graph"
-                )
-            if min(a, b) < 0 or max(a, b) >= data["Recipe"].num_nodes:
-                raise ValueError("out-of-range recipe target")
         for pair in ingredient_pairs.t().tolist():
             if tuple(pair) in context:
                 raise ValueError(f"stage2_{split} target appears in message-passing graph")
@@ -121,7 +103,6 @@ def load_dataset(path: str | Path) -> tuple[HeteroData, dict]:
             ):
                 raise ValueError("out-of-range ingredient target")
         targets[split] = {
-            "recipe": (recipe_pairs, recipe_labels),
             "ingredient": (ingredient_pairs, ingredient_labels),
         }
 

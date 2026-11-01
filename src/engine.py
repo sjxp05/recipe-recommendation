@@ -105,7 +105,7 @@ class RecipeEncoder(nn.Module):
 
 
 class WeightedSAGEConv(nn.Module):
-    """기여도 가중 평균으로 이웃을 모으는 이종 노드 GraphSAGE 계층."""
+    # 기여도 가중 평균으로 이웃 점수를 집계하는 이종 노드 GraphSAGE 계층
 
     def __init__(self, hidden: int):
         super().__init__()
@@ -142,9 +142,7 @@ class IngredientLinkEncoder(nn.Module):
         self.logit_scale = nn.Parameter(torch.tensor(2.0))
         self.bias = nn.Parameter(torch.tensor(0.0))
 
-    def encode_ingredients(
-        self, data: HeteroData, recipe_embeddings: Tensor
-    ) -> Tensor:
+    def encode_ingredients(self, data: HeteroData, recipe_embeddings: Tensor) -> Tensor:
         ingredient_x = F.relu(self.input(data["Ingredient"].x))
         store = data[CONTRIBUTION]
         mask = ~store.is_predicted.bool() if "is_predicted" in store else slice(None)
@@ -158,9 +156,7 @@ class IngredientLinkEncoder(nn.Module):
             dim=-1,
         )
 
-    def encode_recipes(
-        self, data: HeteroData, recipe_embeddings: Tensor
-    ) -> Tensor:
+    def encode_recipes(self, data: HeteroData, recipe_embeddings: Tensor) -> Tensor:
         ingredient_x = F.relu(self.input(data["Ingredient"].x))
         store = data[REV_CONTRIBUTION]
         mask = ~store.is_predicted.bool() if "is_predicted" in store else slice(None)
@@ -183,10 +179,9 @@ class IngredientLinkEncoder(nn.Module):
         recipes = self.encode_recipes(data, recipe_embeddings)
         recipe = F.normalize(self.recipe_head(recipes[pairs[0]]), dim=-1)
         ingredient = F.normalize(self.ingredient_head(ingredients[pairs[1]]), dim=-1)
-        return (
-            (recipe * ingredient).sum(-1) * self.logit_scale.exp().clamp(max=100)
-            + self.bias
-        )
+        return (recipe * ingredient).sum(-1) * self.logit_scale.exp().clamp(
+            max=100
+        ) + self.bias
 
     @torch.no_grad()
     def edge_weights(
@@ -279,7 +274,8 @@ class IngredientLinkEncoder(nn.Module):
                 )
             )
             reverse_store.edge_index = torch.cat(
-                (reverse_existing_edges, new_edges.flip(0).to(reverse_edge_device)), dim=1
+                (reverse_existing_edges, new_edges.flip(0).to(reverse_edge_device)),
+                dim=1,
             )
             reverse_store.edge_weight = torch.cat(
                 (reverse_old_weights, new_weights.to(reverse_edge_device))
@@ -288,7 +284,9 @@ class IngredientLinkEncoder(nn.Module):
                 (
                     reverse_old_predicted,
                     torch.ones(
-                        recommended_ids.numel(), dtype=torch.bool, device=reverse_edge_device
+                        recommended_ids.numel(),
+                        dtype=torch.bool,
+                        device=reverse_edge_device,
                     ),
                 )
             )
