@@ -9,7 +9,7 @@ from torch import Tensor
 from torch_geometric.data import HeteroData
 from torch_geometric.utils import to_undirected
 
-from src.engine import MAIN, REV_MAIN, REV_SUPPORT, SIMILAR, SUPPORT
+from src.engine import CONTRIBUTION, REV_CONTRIBUTION, SIMILAR
 
 
 def _valid_label(value) -> bool:
@@ -26,14 +26,6 @@ def _pairs(rows: list[list[int]]) -> Tensor:
     return torch.tensor(rows, dtype=torch.long).t().contiguous()
 
 
-def _labels(rows: list[list]) -> tuple[Tensor, Tensor]:
-    if any(len(row) != 3 or not _valid_label(row[2]) for row in rows):
-        raise ValueError("recipe label must be a number between 0 and 1")
-    return _pairs([row[:2] for row in rows]), torch.tensor(
-        [row[2] for row in rows], dtype=torch.float
-    )
-
-
 def _similar_edges(rows: list[list]) -> tuple[Tensor, Tensor]:
     allowed_weights = {0.0, 0.25, 0.5, 0.75, 1.0}
     if any(
@@ -48,19 +40,15 @@ def _similar_edges(rows: list[list]) -> tuple[Tensor, Tensor]:
     )
 
 
-def _role_labels(rows: list[list]) -> dict[str, tuple[Tensor, Tensor]]:
-    if any(
-        len(row) != 4 or row[2] not in ("MAIN", "SUPPORT") or not _valid_label(row[3])
-        for row in rows
-    ):
-        raise ValueError("ingredient label must be a number between 0 and 1")
-    return {
-        role: (
-            _pairs([row[:2] for row in rows if row[2] == role]),
-            torch.tensor([row[3] for row in rows if row[2] == role], dtype=torch.float),
-        )
-        for role in ("MAIN", "SUPPORT")
-    }
+def _contributions(rows: list[list]) -> tuple[Tensor, Tensor]:
+    if any(len(row) != 3 or not _valid_label(row[2]) for row in rows):
+        raise ValueError("contribution must be a number between 0 and 1")
+    pairs = [tuple(row[:2]) for row in rows]
+    if len(pairs) != len(set(pairs)):
+        raise ValueError("duplicate contribution pair")
+    return _pairs([row[:2] for row in rows]), torch.tensor(
+        [row[2] for row in rows], dtype=torch.float
+    )
 
 
 def load_dataset(path: str | Path) -> tuple[HeteroData, dict]:
@@ -71,10 +59,11 @@ def load_dataset(path: str | Path) -> tuple[HeteroData, dict]:
     data[SIMILAR].edge_index, data[SIMILAR].edge_weight = _similar_edges(
         raw["similar_edges"]
     )
-    data[MAIN].edge_index = _pairs(raw["main_edges"])
-    data[SUPPORT].edge_index = _pairs(raw["support_edges"])
-    data[REV_MAIN].edge_index = data[MAIN].edge_index.flip(0)
-    data[REV_SUPPORT].edge_index = data[SUPPORT].edge_index.flip(0)
+    data[CONTRIBUTION].edge_index, data[CONTRIBUTION].edge_weight = _contributions(
+        raw["contribution_edges"]
+    )
+    data[REV_CONTRIBUTION].edge_index = data[CONTRIBUTION].edge_index.flip(0)
+    data[REV_CONTRIBUTION].edge_weight = data[CONTRIBUTION].edge_weight.clone()
 
     if data["Recipe"].x.ndim != 2 or data["Ingredient"].x.ndim != 2:
         raise ValueError("node features must be 2D arrays")
@@ -83,7 +72,7 @@ def load_dataset(path: str | Path) -> tuple[HeteroData, dict]:
         or not torch.isfinite(data["Ingredient"].x).all()
     ):
         raise ValueError("node features must be finite")
-    for edge_type in (SIMILAR, MAIN, SUPPORT):
+    for edge_type in (SIMILAR, CONTRIBUTION):
         edges = data[edge_type].edge_index
         destination_count = data[edge_type[2]].num_nodes
         if edges.numel() and (
@@ -101,37 +90,20 @@ def load_dataset(path: str | Path) -> tuple[HeteroData, dict]:
         reduce="mean",
     )
 
-    context = {
-        role: set(map(tuple, data[edge_type].edge_index.t().tolist()))
-        for role, edge_type in (("MAIN", MAIN), ("SUPPORT", SUPPORT))
-    }
-    similar_context = set(map(tuple, data[SIMILAR].edge_index.t().tolist()))
-
+    context = set(map(tuple, data[CONTRIBUTION].edge_index.t().tolist()))
     targets = {}
     for split in ("train", "test"):
-        recipe_pairs, recipe_labels = _labels(raw[f"stage1_{split}"])
-        role_labels = _role_labels(raw[f"stage2_{split}"])
-        for a, b in recipe_pairs.t().tolist():
-            if (a, b) in similar_context:
-                raise ValueError(
-                    f"stage1_{split} target appears in message-passing graph"
-                )
-            if min(a, b) < 0 or max(a, b) >= data["Recipe"].num_nodes:
-                raise ValueError("out-of-range recipe target")
-        for role, (pairs, _) in role_labels.items():
-            for pair in pairs.t().tolist():
-                if tuple(pair) in context[role]:
-                    raise ValueError(
-                        f"stage2_{split} target appears in message-passing graph"
-                    )
-                if not (
-                    0 <= pair[0] < data["Recipe"].num_nodes
-                    and 0 <= pair[1] < data["Ingredient"].num_nodes
-                ):
-                    raise ValueError("out-of-range ingredient target")
+        ingredient_pairs, ingredient_labels = _contributions(raw[f"stage2_{split}"])
+        for pair in ingredient_pairs.t().tolist():
+            if tuple(pair) in context:
+                raise ValueError(f"stage2_{split} target appears in message-passing graph")
+            if not (
+                0 <= pair[0] < data["Recipe"].num_nodes
+                and 0 <= pair[1] < data["Ingredient"].num_nodes
+            ):
+                raise ValueError("out-of-range ingredient target")
         targets[split] = {
-            "recipe": (recipe_pairs, recipe_labels),
-            "ingredient": role_labels,
+            "ingredient": (ingredient_pairs, ingredient_labels),
         }
 
     return data, targets

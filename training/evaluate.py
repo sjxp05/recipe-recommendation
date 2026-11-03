@@ -1,4 +1,4 @@
-# 학습에서 제외한 연결 라벨로 평가하고 후보 연결 가중치 확인
+# 임시 JSON 데이터의 2단계 기여도 평가
 
 from __future__ import annotations
 
@@ -11,12 +11,6 @@ from src.engine import IngredientLinkEncoder, RecipeEncoder
 from training.data import load_dataset
 
 
-def accuracy(weights: torch.Tensor, labels: torch.Tensor) -> float:
-    if labels.numel() == 0:
-        return float("nan")
-    return float(((weights >= 0.5) == labels.bool()).float().mean())
-
-
 def mean_absolute_error(weights: torch.Tensor, labels: torch.Tensor) -> float:
     if labels.numel() == 0:
         return float("nan")
@@ -25,9 +19,9 @@ def mean_absolute_error(weights: torch.Tensor, labels: torch.Tensor) -> float:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--data", type=Path, default=Path("examples/toy_graph.json"))
+    parser.add_argument("--data", type=Path, required=True)
     parser.add_argument(
-        "--stage1-checkpoint", type=Path, default=Path("checkpoints/stage1.pt")
+        "--stage1-checkpoint", type=Path, default=Path("checkpoints/stage1_csv.pt")
     )
     parser.add_argument(
         "--stage2-checkpoint", type=Path, default=Path("checkpoints/stage2.pt")
@@ -51,21 +45,13 @@ def main() -> None:
     ingredients.eval()
     with torch.no_grad():
         recipe_embeddings = recipes(data)
-        pairs, labels = targets["test"]["recipe"]
-        print(
-            f"stage1_test_mae={mean_absolute_error(recipes.score(recipe_embeddings, pairs).sigmoid(), labels):.3f}"
-        )
-        for role, (pairs, labels) in targets["test"]["ingredient"].items():
-            weights = ingredients.edge_weights(data, recipe_embeddings, pairs, role)
-            print(
-                f"stage2_{role.lower()}_test_accuracy={accuracy(weights, labels):.3f}"
-            )
-            for (recipe, ingredient), weight in zip(
-                pairs.t().tolist(), weights.tolist()
-            ):
-                print(
-                    f"  Recipe {recipe} -> Ingredient {ingredient} [{role}]: weight={weight:.3f}"
-                )
+        pairs, labels = targets["test"]["ingredient"]
+        weights = ingredients.edge_weights(data, recipe_embeddings, pairs)
+        print(f"stage2_contribution_test_mae={mean_absolute_error(weights, labels):.3f}")
+        for (recipe, ingredient), label, weight in zip(
+            pairs.t().tolist(), labels.tolist(), weights.tolist()
+        ):
+            print(f"  Recipe {recipe} -> Ingredient {ingredient}: contribution={weight:.3f} target={label:.3f}")
 
 
 if __name__ == "__main__":

@@ -8,13 +8,11 @@ from __future__ import annotations
 import argparse
 import ast
 import csv
-import json
 import random
 from collections import Counter
 from pathlib import Path
 
 import torch
-from torch.nn import functional as F
 
 
 def _read_csv(path: Path) -> list[dict[str, str]]:
@@ -90,12 +88,15 @@ def _pairs_and_labels(
     return pairs, labels
 
 
-def _context_edges(rows: list[tuple[int, int, int]]) -> torch.Tensor:
-    positive = [(a, b) for a, b, score in rows if score >= 1]
+def _context_edges(
+    rows: list[tuple[int, int, int]],
+) -> tuple[torch.Tensor, torch.Tensor]:
+    positive = [(a, b, score / 4) for a, b, score in rows if score >= 1]
     if not positive:
-        return torch.empty((2, 0), dtype=torch.long)
-    forward = torch.tensor(positive, dtype=torch.long).t().contiguous()
-    return torch.cat((forward, forward.flip(0)), dim=1)
+        return torch.empty((2, 0), dtype=torch.long), torch.empty(0)
+    forward = torch.tensor([(a, b) for a, b, _ in positive], dtype=torch.long).t()
+    weights = torch.tensor([weight for _, _, weight in positive], dtype=torch.float32)
+    return torch.cat((forward, forward.flip(0)), dim=1), weights.repeat(2)
 
 
 def _fold_context(
@@ -140,7 +141,7 @@ def _graph(features: torch.Tensor, context_rows: list[tuple[int, int, int]]):
 
     data = HeteroData()
     data["Recipe"].x = features
-    data[SIMILAR].edge_index = _context_edges(context_rows)
+    data[SIMILAR].edge_index, data[SIMILAR].edge_weight = _context_edges(context_rows)
     return data
 
 
@@ -149,76 +150,6 @@ def _load_artifact(path: Path) -> dict:
     if not isinstance(artifact["recipe_features"], torch.Tensor):
         raise ValueError("invalid stage-1 feature artifact")
     return artifact
-
-
-def export_json(args: argparse.Namespace) -> None:
-    artifact = _load_artifact(args.data)
-    recipe_ids = artifact["recipe_ids"]
-    features = artifact["recipe_features"]
-    args.output.parent.mkdir(parents=True, exist_ok=True)
-
-    # 임베딩을 한 행씩 기록하여 전체 변환본의 메모리 중복 방지
-    with args.output.open("w", encoding="utf-8") as handle:
-        handle.write('{\n  "encoder": ')
-        json.dump(artifact["encoder"], handle, ensure_ascii=False)
-        handle.write(',\n  "seed": ')
-        json.dump(artifact["seed"], handle)
-        handle.write(',\n  "recipe_ids": ')
-        json.dump(recipe_ids, handle, ensure_ascii=False)
-        handle.write(',\n  "recipe_features": [\n')
-        for index, vector in enumerate(features):
-            if index:
-                handle.write(",\n")
-            handle.write("    ")
-            json.dump(vector.tolist(), handle, separators=(",", ":"))
-        handle.write('\n  ],\n  "splits": {\n')
-        for split_index, (name, rows) in enumerate(artifact["splits"].items()):
-            if split_index:
-                handle.write(",\n")
-            handle.write(f"    {json.dumps(name)}: [\n")
-            for index, (a, b, score) in enumerate(rows):
-                if index:
-                    handle.write(",\n")
-                handle.write("      ")
-                json.dump(
-                    {
-                        "a_id": recipe_ids[a],
-                        "b_id": recipe_ids[b],
-                        "similarity": score,
-                        "label": score / 4,
-                    },
-                    handle,
-                    ensure_ascii=False,
-                )
-            handle.write("\n    ]")
-        handle.write("\n  }\n}\n")
-    summary = {
-        "encoder": artifact["encoder"],
-        "seed": artifact["seed"],
-        "recipe_count": len(recipe_ids),
-        "feature_shape": list(features.shape),
-        "feature_dtype": str(features.dtype),
-        "splits": {
-            name: [
-                {
-                    "a_id": recipe_ids[a],
-                    "b_id": recipe_ids[b],
-                    "similarity": score,
-                    "label": score / 4,
-                }
-                for a, b, score in rows
-            ]
-            for name, rows in artifact["splits"].items()
-        },
-    }
-    args.summary_output.parent.mkdir(parents=True, exist_ok=True)
-    args.summary_output.write_text(
-        json.dumps(summary, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
-    )
-    print(f"json={args.output} size={args.output.stat().st_size:,} bytes")
-    print(
-        f"summary={args.summary_output} size={args.summary_output.stat().st_size:,} bytes"
-    )
 
 
 def train(args: argparse.Namespace) -> None:
@@ -241,7 +172,8 @@ def train(args: argparse.Namespace) -> None:
         order = list(range(len(train_rows)))
         rng.shuffle(order)
         fold_indices = [order[i :: args.folds] for i in range(args.folds)]
-        losses = []
+        squared_error_sum = 0.0
+        prediction_count = 0
         model.train()
         for selected in fold_indices:
             if not selected:
@@ -252,12 +184,16 @@ def train(args: argparse.Namespace) -> None:
             data = _graph(features, context)
             optimizer.zero_grad()
             predictions = model.score(model(data), pairs).sigmoid()
-            loss = F.mse_loss(predictions, labels)
+            # 학습 손실과 출력 오차를 모두 정규화된 0~1 척도 RMSE로 계산
+            squared_errors = (predictions - labels).square()
+            loss = (squared_errors.mean() + 1e-8).sqrt()
             loss.backward()
             optimizer.step()
-            losses.append(float(loss.detach()))
+            squared_error_sum += float(squared_errors.detach().sum())
+            prediction_count += len(labels)
         if (epoch + 1) % max(1, args.epochs // 10) == 0:
-            print(f"epoch={epoch + 1} train_mse={sum(losses) / len(losses):.4f}")
+            train_rmse = (squared_error_sum / prediction_count) ** 0.5
+            print(f"epoch={epoch + 1} train_rmse={train_rmse:.4f}")
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
     torch.save(
@@ -282,7 +218,7 @@ def score_metrics(predictions: torch.Tensor, labels: torch.Tensor) -> dict:
 
     actual = (labels * 4).round().long().clamp(0, 4)
     predicted = (predictions * 4).round().long().clamp(0, 4)
-    errors = (predictions - labels).abs()
+    errors = predictions - labels
     exact = (predicted == actual).float().mean().item()
     within_one = ((predicted - actual).abs() <= 1).float().mean().item()
     positive_actual = actual >= 2
@@ -300,8 +236,8 @@ def score_metrics(predictions: torch.Tensor, labels: torch.Tensor) -> dict:
         for truth in range(5)
     ]
     return {
-        "mae_points": errors.mean().item() * 4,
-        "rmse_points": (errors.square().mean().sqrt().item()) * 4,
+        "mae": errors.mean().item() * 4,
+        "rmse": errors.square().mean().sqrt().item(),
         "exact_accuracy": exact,
         "within_one_accuracy": within_one,
         "zero_baseline_exact": (actual == 0).float().mean().item(),
@@ -343,7 +279,7 @@ def evaluate(args: argparse.Namespace) -> None:
     # 직접 연결되지 않은 쌍도 레시피별 텍스트 특징으로 점수 계산
     data = _graph(features, artifact["splits"]["train"])
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    print("판정 기준: 예측 유사도 × 4를 반올림해 0~4점으로 변환, 2점 이상은 유사 쌍")
+    print("변환 기준: 예측 유사도 × 4를 반올림해 0~4점으로 변환, 2점 이상은 유사 쌍")
     with torch.no_grad(), args.output.open("w", encoding="utf-8", newline="") as handle:
         writer = csv.writer(handle)
         writer.writerow(("a_id", "b_id", "similarity", "predicted_similarity"))
@@ -356,9 +292,10 @@ def evaluate(args: argparse.Namespace) -> None:
             _write_prediction_rows(writer, artifact["recipe_ids"], rows, predictions)
             print(f"{split_name}: n={len(rows)}")
             print(
-                f"  점수 오차(0~4): MAE={metrics['mae_points']:.3f} "
-                f"RMSE={metrics['rmse_points']:.3f}"
+                f"  점수 오차(0~4 라벨 기준): MAE={metrics['mae']:.4f} "
+                f"  RMSE={metrics['rmse']*4:.4f}"
             )
+            print(f"  유사도 오차(0~1): RMSE={metrics['rmse']:.4f}")
             print(f"  정답 비율={metrics['exact_accuracy']:.1%}")
             print(f"  근접 비율(오차 1점 이내)={metrics['within_one_accuracy']:.1%}")
             print(
@@ -403,6 +340,70 @@ def predict(args: argparse.Namespace) -> None:
     )
 
 
+def rank_similar_recipes(
+    model, embeddings: torch.Tensor, recipe_index: int, top_k: int
+) -> tuple[torch.Tensor, torch.Tensor]:
+    if not 0 <= recipe_index < len(embeddings):
+        raise ValueError("recipe index is outside the graph")
+    if top_k < 1:
+        raise ValueError("top_k must be positive")
+    candidates = torch.arange(len(embeddings), device=embeddings.device)
+    candidates = candidates[candidates != recipe_index]
+    if candidates.numel() == 0:
+        return candidates, embeddings.new_empty(0)
+    pairs = torch.stack((torch.full_like(candidates, recipe_index), candidates))
+    similarities = model.score(embeddings, pairs).sigmoid()
+    values, positions = similarities.topk(min(top_k, len(candidates)))
+    return candidates[positions], values
+
+
+def top_similar(args: argparse.Namespace) -> None:
+    from src.engine import RecipeEncoder
+
+    artifact = _load_artifact(args.data)
+    recipe_ids = [str(recipe_id) for recipe_id in artifact["recipe_ids"]]
+    recipe_id = str(args.recipe_id).strip()
+    id_to_index = {value: index for index, value in enumerate(recipe_ids)}
+    if recipe_id not in id_to_index:
+        raise ValueError(f"recipe ID absent from stage1.pt: {recipe_id}")
+    if args.top_k < 1:
+        raise ValueError("top_k must be positive")
+
+    features = artifact["recipe_features"]
+    saved = torch.load(args.checkpoint, map_location="cpu", weights_only=True)
+    if (
+        saved["recipe_features"] != features.shape[1]
+        or saved["data_seed"] != artifact["seed"]
+    ):
+        raise ValueError("checkpoint does not match the feature artifact")
+    model = RecipeEncoder(features.shape[1], saved["hidden"])
+    model.load_state_dict(saved["model"])
+    model.eval()
+    data = _graph(features, artifact["splits"]["train"])
+    names = {row["id"]: row["name"] for row in unique_recipes(_read_csv(args.recipes))}
+    if recipe_id not in names:
+        raise ValueError(f"recipe ID absent from recipe CSV: {recipe_id}")
+
+    with torch.no_grad():
+        indices, similarities = rank_similar_recipes(
+            model, model(data), id_to_index[recipe_id], args.top_k
+        )
+    ranked_ids = [recipe_ids[index] for index in indices.tolist()]
+    missing_names = [
+        candidate_id for candidate_id in ranked_ids if candidate_id not in names
+    ]
+    if missing_names:
+        raise ValueError(
+            f"recipe IDs absent from recipe CSV: {', '.join(missing_names)}"
+        )
+    print(f"기준 레시피: {recipe_id} | {names[recipe_id]}")
+    print("순위\t레시피 ID\t레시피 이름\t예측 유사도(0~1)")
+    for rank, (candidate_id, similarity) in enumerate(
+        zip(ranked_ids, similarities.tolist(), strict=True), start=1
+    ):
+        print(f"{rank}\t{candidate_id}\t{names[candidate_id]}\t{similarity:.4f}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="CSV 기반 1단계 레시피 유사도 학습")
     subcommands = parser.add_subparsers(dest="command", required=True)
@@ -414,20 +415,18 @@ def main() -> None:
     prepare_parser.add_argument(
         "--pairs", type=Path, default=Path("data/labeled_pairs_masked.csv")
     )
-    prepare_parser.add_argument("--output", type=Path, default=Path("data/stage1.pt"))
+    prepare_parser.add_argument(
+        "--output", type=Path, default=Path("data/stage1_embeddings.pt")
+    )
     prepare_parser.add_argument("--batch-size", type=int, default=32)
     prepare_parser.add_argument("--seed", type=int, default=42)
-    export_parser = subcommands.add_parser("export-json")
-    export_parser.add_argument("--data", type=Path, default=Path("data/stage1.pt"))
-    export_parser.add_argument("--output", type=Path, default=Path("data/stage1.json"))
-    export_parser.add_argument(
-        "--summary-output", type=Path, default=Path("data/stage1_summary.json")
-    )
 
     train_parser = subcommands.add_parser("train")
-    train_parser.add_argument("--data", type=Path, default=Path("data/stage1.pt"))
     train_parser.add_argument(
-        "--output", type=Path, default=Path("checkpoints/stage1_csv.pt")
+        "--data", type=Path, default=Path("data/stage1_embeddings.pt")
+    )
+    train_parser.add_argument(
+        "--output", type=Path, default=Path("checkpoints/stage1.pt")
     )
     train_parser.add_argument("--hidden", type=int, default=32)
     train_parser.add_argument("--epochs", type=int, default=100)
@@ -436,27 +435,44 @@ def main() -> None:
     train_parser.add_argument("--seed", type=int, default=42)
 
     eval_parser = subcommands.add_parser("evaluate")
-    eval_parser.add_argument("--data", type=Path, default=Path("data/stage1.pt"))
     eval_parser.add_argument(
-        "--checkpoint", type=Path, default=Path("checkpoints/stage1_csv.pt")
+        "--data", type=Path, default=Path("data/stage1_embeddings.pt")
     )
     eval_parser.add_argument(
-        "--output", type=Path, default=Path("data/stage1_csv_predictions.csv")
+        "--checkpoint", type=Path, default=Path("checkpoints/stage1.pt")
+    )
+    eval_parser.add_argument(
+        "--output", type=Path, default=Path("data/stage1_predictions.csv")
     )
 
     predict_parser = subcommands.add_parser("predict")
-    predict_parser.add_argument("--data", type=Path, default=Path("data/stage1.pt"))
     predict_parser.add_argument(
-        "--checkpoint", type=Path, default=Path("checkpoints/stage1_csv.pt")
+        "--data", type=Path, default=Path("data/stage1_embeddings.pt")
+    )
+    predict_parser.add_argument(
+        "--checkpoint", type=Path, default=Path("checkpoints/stage1.pt")
     )
     predict_parser.add_argument("--a-id", required=True)
     predict_parser.add_argument("--b-id", required=True)
 
+    similar_parser = subcommands.add_parser("top-similar")
+    similar_parser.add_argument(
+        "--data", type=Path, default=Path("data/stage1_embeddings.pt")
+    )
+    similar_parser.add_argument(
+        "--checkpoint", type=Path, default=Path("checkpoints/stage1.pt")
+    )
+    similar_parser.add_argument(
+        "--recipes", type=Path, default=Path("data/recipes_masked.csv")
+    )
+    similar_parser.add_argument("--recipe-id", required=True)
+    similar_parser.add_argument("--top-k", type=int, default=10)
+
     args = parser.parse_args()
     if args.command == "prepare":
         prepare(args)
-    elif args.command == "export-json":
-        export_json(args)
+    elif args.command == "top-similar":
+        top_similar(args)
     elif args.command == "train":
         train(args)
     elif args.command == "evaluate":
