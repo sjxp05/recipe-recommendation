@@ -1,7 +1,13 @@
+import argparse
 import csv
+import sys
+import types
+from contextlib import redirect_stdout
+from io import StringIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
+from unittest.mock import patch
 
 import torch
 
@@ -14,11 +20,64 @@ from training.stage1 import (
     recipe_text,
     score_metrics,
     split_pairs,
+    train,
     unique_recipes,
 )
 
 
 class Stage1CsvTests(unittest.TestCase):
+    def test_train_stops_after_patience_and_saves_best_validation_model(self):
+        class RecipeEncoder(torch.nn.Module):
+            def __init__(self, recipe_features, hidden):
+                super().__init__()
+                self.logit = torch.nn.Parameter(torch.tensor(0.0))
+
+            def forward(self, data):
+                return data
+
+            def score(self, embeddings, pairs):
+                return self.logit.expand(pairs.shape[1])
+
+        fake_engine = types.ModuleType("src.engine")
+        fake_engine.RecipeEncoder = RecipeEncoder
+
+        with TemporaryDirectory() as directory:
+            data_path = Path(directory) / "data.pt"
+            checkpoint_path = Path(directory) / "model.pt"
+            features = torch.tensor(
+                [[1.0, 0.0], [0.0, 1.0], [1.0, 1.0], [-1.0, 1.0]]
+            )
+            train_rows = [(0, 1, 4), (1, 2, 4)]
+            val_rows = [(2, 3, 0)]
+            torch.save(
+                {
+                    "recipe_features": features,
+                    "splits": {"train": train_rows, "val": val_rows, "test": [(0, 3, 0)]},
+                    "seed": 42,
+                },
+                data_path,
+            )
+            args = argparse.Namespace(
+                data=data_path, output=checkpoint_path, hidden=4,
+                folds=2, epochs=10, patience=2, lr=0.1, seed=42,
+            )
+            output = StringIO()
+            with patch.dict(sys.modules, {"src.engine": fake_engine}), patch(
+                "training.stage1._graph", side_effect=lambda data, rows: data
+            ), redirect_stdout(output):
+                train(args)
+
+            self.assertIn("early_stopping epoch=3 patience=2", output.getvalue())
+            self.assertEqual(output.getvalue().count("val_rmse="), 4)
+            saved = torch.load(checkpoint_path, map_location="cpu", weights_only=True)
+            self.assertEqual(saved["best_epoch"], 1)
+            model = RecipeEncoder(features.shape[1], saved["hidden"])
+            model.load_state_dict(saved["model"])
+            with torch.no_grad():
+                predictions = model.score(features, torch.tensor([[2], [3]])).sigmoid()
+            expected_rmse = float(predictions.square().mean().sqrt())
+            self.assertAlmostEqual(saved["best_val_rmse"], expected_rmse)
+
     def test_rank_similar_recipes_excludes_self_and_respects_top_k(self):
         class Model:
             def score(self, embeddings, pairs):

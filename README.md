@@ -130,8 +130,8 @@ python -m training.stage1 top-similar --recipe-id 172520 --top-k 10
 - `prepare`: BGE 모델을 처음 사용할 때 다운로드, 인코딩 결과와 점수별 비율을 유지하면서 나눈 train/val/test 쌍을 `data/stage1.pt`에 저장
     - 옵션: `--recipes`, `--pairs`, `--output`, `--seed`, `--batch-size`
 
-- `train`: 학습 모델 생성 (결과 파일: `checkpoints/stage1.pt`)
-    - 옵션: `--data`, `--output`, `--hidden`, `--epochs`, `--folds`, `--lr`, `--seed`
+- `train`: 매 epoch 검증 쌍의 0~1 유사도 RMSE를 계산하고 최저 검증 RMSE의 모델만 `checkpoints/stage1.pt`에 저장. 검증 RMSE가 연속 `--patience` epoch 동안 개선되지 않으면 조기 종료
+    - 옵션: `--data`, `--output`, `--hidden`, `--epochs`, `--folds`, `--patience`(기본 10), `--lr`, `--seed`
 
 - `evaluate`: 생성한 모델 검증/테스트, 유사도 2점 이상을 positive로 간주하여 정확도 계산. 검증·테스트 쌍의 `a_id,b_id,similarity,predicted_similarity`(정답과 예측 모두 0~4점)를 `data/stage1_predictions.csv`에 저장 (`--output`으로 경로 변경 가능)
     - 옵션: `--data`, `--checkpoint`, `--output`
