@@ -8,6 +8,7 @@ from __future__ import annotations
 import argparse
 import ast
 import csv
+import json
 import math
 import random
 from collections import Counter
@@ -22,10 +23,22 @@ def _read_csv(path: Path) -> list[dict[str, str]]:
 
 
 def _items(value: str) -> list[str]:
-    parsed = ast.literal_eval(value)
-    if not isinstance(parsed, list) or not all(isinstance(x, str) for x in parsed):
-        raise ValueError("expected a list of strings in recipe CSV")
-    return parsed
+    try:
+        parsed = json.loads(value)
+    except json.JSONDecodeError:
+        # 기존 CSV는 Python 문자열 목록, 구조화된 steps는 JSON으로 저장됨.
+        parsed = ast.literal_eval(value)
+    if not isinstance(parsed, list) or not all(
+        isinstance(item, (str, dict)) for item in parsed
+    ):
+        raise ValueError("expected a list of strings or step objects in recipe CSV")
+    # operations와 중첩 clauses, MASK 정보를 유지하며 BGE 입력 문자열로 변환.
+    return [
+        item if isinstance(item, str) else json.dumps(
+            item, ensure_ascii=False, separators=(",", ":")
+        )
+        for item in parsed
+    ]
 
 
 def recipe_text(row: dict[str, str]) -> str:

@@ -1,5 +1,6 @@
 import argparse
 import csv
+import json
 import sys
 import types
 from contextlib import redirect_stdout
@@ -26,6 +27,38 @@ from training.stage1 import (
 
 
 class Stage1CsvTests(unittest.TestCase):
+    def test_recipe_text_accepts_structured_json_steps(self):
+        steps = [
+            {
+                "text": None,
+                "operations": [{
+                    "kind": "OP",
+                    "data": {
+                        "verb": "add",
+                        "object": "[MASK:I0|vegetables|composition_flavor|0.9]",
+                        "clauses": [{"marker": "if", "ops": [{"verb": "boil"}]}],
+                    },
+                }],
+            },
+            {"text": None, "operations": [{"kind": "RAW", "data": {"raw": "simmer"}}]},
+        ]
+        text = recipe_text({"name": "soup", "steps": json.dumps(steps)})
+        encoded_steps = text.removeprefix("Recipe: soup. Steps: ")
+        decoder = json.JSONDecoder()
+        first, end = decoder.raw_decode(encoded_steps)
+        self.assertEqual(first, steps[0])
+        self.assertEqual(json.loads(encoded_steps[end:]), steps[1])
+        self.assertIn("simmer", text)
+
+    def test_recipe_text_accepts_json_string_steps_and_rejects_invalid_shapes(self):
+        self.assertEqual(
+            recipe_text({"name": "soup", "steps": '["boil water", "add onion"]'}),
+            "Recipe: soup. Steps: boil water add onion",
+        )
+        for steps in ('null', '{}', '[1, 2]', '[null]'):
+            with self.subTest(steps=steps), self.assertRaisesRegex(ValueError, "list"):
+                recipe_text({"name": "soup", "steps": steps})
+
     def test_train_stops_after_patience_and_saves_best_validation_model(self):
         class RecipeEncoder(torch.nn.Module):
             def __init__(self, recipe_features, hidden):
