@@ -3,7 +3,7 @@
 This experiment covers only recipe text, a 768-dimensional sentence encoder,
 and the existing stage-1 GraphSAGE. It uses the same 0–4 labeled pairs, recipe
 order, train/validation/test split, graph construction, and training settings
-for every condition. There are four views and three encoders: 12 runs.
+for every condition. There are four views and six encoders: 24 runs.
 
 | View | Encoder input |
 | --- | --- |
@@ -21,13 +21,16 @@ does not cover the same recipes. The raw and assembly masked texts were also
 checked against every complete ingredient name of length at least four in the
 current 2,916-recipe data; none remained.
 
-Encoders: `BAAI/bge-base-en-v1.5`, `intfloat/e5-base-v2`, and
-`sentence-transformers/all-mpnet-base-v2`. E5 receives its documented `query: `
-prefix for symmetric similarity. All outputs must be exactly 768 dimensions.
+Encoders: `BAAI/bge-base-en-v1.5`, `intfloat/e5-base-v2`,
+`sentence-transformers/all-mpnet-base-v2`, `thenlper/gte-base`,
+`intfloat/multilingual-e5-base`, and
+`sentence-transformers/all-distilroberta-v1`. Both E5 models receive their
+documented `query: ` prefix for symmetric similarity. All outputs must be
+exactly 768 dimensions.
 Long inputs are split into token-bounded windows; all windows are encoded,
 combined by token-count-weighted mean, and normalized back to 768 dimensions.
 The number of recipes requiring multiple windows and the total window count
-are saved with each feature artifact and reported in the final results.
+are saved with each feature artifact and in `results.csv`.
 
 Run from the repository root. Replace `$pairs` with the current labeled-pair
 CSV path. `prepare` creates texts only; `encode` downloads/loads the selected
@@ -40,16 +43,19 @@ $out = Join-Path $project '구현\graphsage_assembly_20261029\stage1_matrix_text
 python -m training.stage1_matrix prepare --project-root $project --pairs $pairs --assembly-db (Join-Path $project '데이터\recipe_assembly_v5.sqlite') --masked-cache (Join-Path $project '구현\labeled_pairs_jihee_masked_v5.csv') --id-map (Join-Path $project '데이터\ingredient_ids_reviewed\output\ingredient_name_old_new_simple.csv') --out $out
 python -m training.stage1_matrix encode --out $out
 python -m training.stage1_matrix fit --out $out
+python -m training.stage1_report --out $out
 ```
 
-`--encoders bge`, `--encoders e5`, or `--encoders mpnet` runs one encoder at a
-time. The encoded feature artifacts are cached. A checkpoint is reused only
+For example, `--encoders gte` runs one encoder; multiple names select multiple
+encoders. The encoded feature artifacts are cached. A checkpoint is reused only
 when its feature artifact and training settings match its saved provenance;
 `--overwrite` explicitly replaces existing artifacts or checkpoints.
 
 `fit` writes each checkpoint, a test-pair prediction CSV, and a `results.csv`
-containing MAE, RMSE, exact-score accuracy, positive-pair F1, validation RMSE,
-best epoch, and window counts. The 3,192-pair source uses pair-level splits,
-so recipes can occur in more than one split. The v5 tagger has its own training
-history; these comparisons measure this fixed pipeline and do not constitute
+containing train/validation/test RMSE, MAE, exact and within-one accuracy,
+positive-pair precision/recall/F1, balanced accuracy, a 5×5 confusion matrix,
+best epoch, and window counts. `stage1_report` writes the complete 24-condition
+table and confusion matrices to `RESULTS.md`. The 3,192-pair source uses
+pair-level splits, so recipes can occur in more than one split. The v5 tagger
+has its own training history; these comparisons measure this fixed pipeline and do not constitute
 independent generalization to entirely unseen recipes.

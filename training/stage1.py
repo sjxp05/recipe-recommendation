@@ -237,6 +237,7 @@ def train(args: argparse.Namespace) -> None:
                     "data_seed": artifact["seed"],
                     "best_epoch": best_epoch,
                     "best_val_rmse": best_val_rmse,
+                    "best_train_rmse": train_rmse,
                 },
                 args.output,
             )

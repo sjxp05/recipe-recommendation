@@ -1,4 +1,4 @@
-"""Prepare and run the 4-view x 3-encoder stage-1 GraphSAGE comparison.
+"""Prepare and run the 4-view x 6-encoder stage-1 GraphSAGE comparison.
 
 Commands are separate so preparing texts never starts encoding or training.
 """
@@ -33,6 +33,9 @@ ENCODERS = {
     "bge": ("BAAI/bge-base-en-v1.5", ""),
     "e5": ("intfloat/e5-base-v2", "query: "),
     "mpnet": ("sentence-transformers/all-mpnet-base-v2", ""),
+    "gte": ("thenlper/gte-base", ""),
+    "multilingual_e5": ("intfloat/multilingual-e5-base", "query: "),
+    "distilroberta": ("sentence-transformers/all-distilroberta-v1", ""),
 }
 DIMENSION = 768
 ENCODING_STRATEGY = "token_window_weighted_mean_v1"
@@ -115,7 +118,7 @@ def prepare(args) -> None:
     finally:
         for handle in handles.values():
             handle.close()
-    manifest = {"schema": "stage1-4x3-v1", "recipe_ids": ids,
+    manifest = {"schema": "stage1-views-v1", "recipe_ids": ids,
                 "splits": splits, "seed": 42, "dimension": DIMENSION,
                 "sources": {name: {"path": str(path.resolve()), "sha256": sha256(path)}
                             for name, path in (("pairs", args.pairs),
@@ -203,15 +206,27 @@ def test_metrics(artifact_path: Path, checkpoint_path: Path) -> dict:
     with torch.no_grad():
         scores = model.score(model(_graph(features, artifact["splits"]["train"])), pairs).sigmoid()
     metrics = score_metrics(scores, labels)
-    return {"test_pairs": len(labels), "mae_0_4": metrics["mae"],
+    return {"test_pairs": len(labels),
+            "train_rmse_0_1": saved["best_train_rmse"],
+            "val_rmse_0_1": saved["best_val_rmse"],
+            "test_rmse_0_1": metrics["rmse"],
+            "mae_0_4": metrics["mae"],
             "rmse_0_4": metrics["rmse"] * 4,
             "exact_accuracy": metrics["exact_accuracy"],
+            "within_one_accuracy": metrics["within_one_accuracy"],
+            "positive_precision": metrics["positive_precision"],
+            "positive_recall": metrics["positive_recall"],
             "positive_f1": metrics["positive_f1"],
-            "best_val_rmse_0_1": saved["best_val_rmse"],
+            "balanced_accuracy": metrics["balanced_accuracy"],
+            "confusion_matrix": json.dumps(metrics["confusion"], separators=(",", ":")),
             "best_epoch": saved["best_epoch"]}
 
 
 def fit(args) -> None:
+    # CPU scatter reductions can otherwise vary slightly between runs and
+    # change the selected early-stopping epoch.
+    torch.set_num_threads(1)
+    torch.use_deterministic_algorithms(True)
     manifest = read_manifest(args.out)
     result_path = args.out / "results.csv"
     if result_path.exists():
@@ -263,10 +278,14 @@ def fit(args) -> None:
 
 def write_results(path: Path, rows: list[dict]) -> None:
     path.parent.mkdir(exist_ok=True)
-    with path.open("w", encoding="utf-8", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=list(rows[0]))
+    fields = list(rows[0])
+    fields.extend(key for row in rows for key in row if key not in fields)
+    temporary = path.with_suffix(path.suffix + ".partial")
+    with temporary.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fields)
         writer.writeheader()
         writer.writerows(rows)
+    temporary.replace(path)
 
 
 def main() -> None:
