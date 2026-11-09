@@ -1,0 +1,42 @@
+import json
+import re
+import unittest
+
+from training.stage1_views import masked_assembly, unified_assembly
+
+
+class Stage1ViewsTests(unittest.TestCase):
+    def test_unified_assembly_replaces_legacy_ids(self):
+        source = ('RECIPE {"name":"pork soup"}\n'
+                  'ING I0 {"source":"lean pork chops","id":4207,'
+                  '"general_id":4207,"name":"lean pork chops","status":"id_normalized"}\n'
+                  '\nRAW {"raw":"cook @I0"}\n')
+        mapping = ({(4207, "lean pork chops"): 9001}, {"lean pork chops": {9001}})
+        result = unified_assembly(source, mapping)
+        ingredient = json.loads(result.splitlines()[1].split(" ", 2)[2])
+        self.assertEqual(json.loads(result.splitlines()[0][7:]), {"name": "pork soup"})
+        self.assertEqual(ingredient["unified_id"], 9001)
+        self.assertNotIn("id", ingredient)
+        self.assertNotIn("general_id", ingredient)
+
+    def test_masked_assembly_removes_ingredient_identity(self):
+        source = ('RECIPE {"name":"lean pork chops"}\n'
+                  'ING I0 {"source":"lean pork chops","name":"lean pork chops",'
+                  '"unified_id":9001}\n'
+                  '\nRAW {"raw":"cook lean pork chops and @I0",'
+                  '"mentions":[{"name":"lean pork chops","id":4207}]}\n')
+        tag = ("I0", "육류", "요리 중심재료", 0.910849, "[MASK:I0|육류|요리 중심재료|0.910849]")
+
+        def redact(value, patterns, tags):
+            return re.sub("lean pork chops|@I0", tags["I0"], value)
+
+        result = masked_assembly(source, [tag], None, redact)
+        self.assertIn('ING I0 ["육류", "요리 중심재료", 0.910849]', result)
+        self.assertNotIn("lean pork chops", result)
+        self.assertNotIn("9001", result)
+        self.assertNotIn("4207", result)
+        self.assertNotIn("mentions", result)
+
+
+if __name__ == "__main__":
+    unittest.main()
