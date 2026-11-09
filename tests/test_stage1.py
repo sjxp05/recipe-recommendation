@@ -162,7 +162,9 @@ class Stage1CsvTests(unittest.TestCase):
         labels = torch.tensor([0.0, 0.25, 0.5, 0.75, 1.0])
         predictions = torch.tensor([0.05, 0.30, 0.46, 0.55, 0.90])
         metrics = score_metrics(predictions, labels)
+        expected_mae = (predictions - labels).abs().mean().item() * 4
         expected_rmse = ((predictions - labels).square().mean().sqrt()).item()
+        self.assertAlmostEqual(metrics["mae"], expected_mae)
         self.assertAlmostEqual(metrics["rmse"], expected_rmse)
         self.assertNotIn("rmse_points", metrics)
         self.assertNotIn("mae_points", metrics)

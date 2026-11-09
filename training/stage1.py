@@ -278,7 +278,7 @@ def score_metrics(predictions: torch.Tensor, labels: torch.Tensor) -> dict:
         for truth in range(5)
     ]
     return {
-        "mae": errors.mean().item() * 4,
+        "mae": errors.abs().mean().item() * 4,
         "rmse": errors.square().mean().sqrt().item(),
         "exact_accuracy": exact,
         "within_one_accuracy": within_one,
