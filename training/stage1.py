@@ -8,6 +8,8 @@ from __future__ import annotations
 import argparse
 import ast
 import csv
+import json
+import math
 import random
 from collections import Counter
 from pathlib import Path
@@ -21,10 +23,22 @@ def _read_csv(path: Path) -> list[dict[str, str]]:
 
 
 def _items(value: str) -> list[str]:
-    parsed = ast.literal_eval(value)
-    if not isinstance(parsed, list) or not all(isinstance(x, str) for x in parsed):
-        raise ValueError("expected a list of strings in recipe CSV")
-    return parsed
+    try:
+        parsed = json.loads(value)
+    except json.JSONDecodeError:
+        # 기존 CSV는 Python 문자열 목록, 구조화된 steps는 JSON으로 저장됨.
+        parsed = ast.literal_eval(value)
+    if not isinstance(parsed, list) or not all(
+        isinstance(item, (str, dict)) for item in parsed
+    ):
+        raise ValueError("expected a list of strings or step objects in recipe CSV")
+    # operations와 중첩 clauses, MASK 정보를 유지하며 BGE 입력 문자열로 변환.
+    return [
+        item if isinstance(item, str) else json.dumps(
+            item, ensure_ascii=False, separators=(",", ":")
+        )
+        for item in parsed
+    ]
 
 
 def recipe_text(row: dict[str, str]) -> str:
@@ -158,13 +172,23 @@ def train(args: argparse.Namespace) -> None:
     artifact = _load_artifact(args.data)
     features = artifact["recipe_features"]
     train_rows = artifact["splits"]["train"]
+    val_rows = artifact["splits"]["val"]
     if not train_rows:
         raise ValueError("training split is empty")
-    if args.folds < 2 or args.epochs < 1:
-        raise ValueError("folds must be >= 2 and epochs must be >= 1")
+    if not val_rows:
+        raise ValueError(
+            "validation split is empty; early stopping requires validation pairs"
+        )
+    if args.folds < 2 or args.epochs < 1 or args.patience < 1:
+        raise ValueError("folds must be >= 2; epochs and patience must be >= 1")
     rng = random.Random(args.seed)
     model = RecipeEncoder(features.shape[1], args.hidden)
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
+    val_data = _graph(features, train_rows)
+    val_pairs, val_labels = _pairs_and_labels(val_rows)
+    best_val_rmse = float("inf")
+    best_epoch = 0
+    stale_epochs = 0
 
     # 폴드 교대 제외로 모든 학습 쌍을 예측 대상에 포함
     # 현재 예측 폴드의 SIMILAR 연결은 입력 그래프에서 제외
@@ -191,21 +215,39 @@ def train(args: argparse.Namespace) -> None:
             optimizer.step()
             squared_error_sum += float(squared_errors.detach().sum())
             prediction_count += len(labels)
-        if (epoch + 1) % max(1, args.epochs // 10) == 0:
-            train_rmse = (squared_error_sum / prediction_count) ** 0.5
-            print(f"epoch={epoch + 1} train_rmse={train_rmse:.4f}")
+        model.eval()
+        with torch.no_grad():
+            val_predictions = model.score(model(val_data), val_pairs).sigmoid()
+            val_rmse = float((val_predictions - val_labels).square().mean().sqrt())
+        if not math.isfinite(val_rmse):
+            raise ValueError("validation RMSE is not finite")
+        train_rmse = (squared_error_sum / prediction_count) ** 0.5
+        print(f"epoch={epoch + 1} train_rmse={train_rmse:.4f} val_rmse={val_rmse:.4f}")
 
-    args.output.parent.mkdir(parents=True, exist_ok=True)
-    torch.save(
-        {
-            "model": model.state_dict(),
-            "hidden": args.hidden,
-            "recipe_features": features.shape[1],
-            "data_seed": artifact["seed"],
-        },
-        args.output,
+        if val_rmse < best_val_rmse:
+            best_val_rmse = val_rmse
+            best_epoch = epoch + 1
+            stale_epochs = 0
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            torch.save(
+                {
+                    "model": model.state_dict(),
+                    "hidden": args.hidden,
+                    "recipe_features": features.shape[1],
+                    "data_seed": artifact["seed"],
+                    "best_epoch": best_epoch,
+                    "best_val_rmse": best_val_rmse,
+                },
+                args.output,
+            )
+        else:
+            stale_epochs += 1
+            if stale_epochs >= args.patience:
+                print(f"early_stopping epoch={epoch + 1} patience={args.patience}")
+                break
+    print(
+        f"best_epoch={best_epoch} best_val_rmse={best_val_rmse:.4f} checkpoint={args.output}"
     )
-    print(f"checkpoint={args.output}")
 
 
 def score_metrics(predictions: torch.Tensor, labels: torch.Tensor) -> dict:
@@ -284,7 +326,7 @@ def evaluate(args: argparse.Namespace) -> None:
         writer = csv.writer(handle)
         writer.writerow(("a_id", "b_id", "similarity", "predicted_similarity"))
         embeddings = model(data)
-        for split_name in ("val", "test"):
+        for split_name in ("test",):
             rows = artifact["splits"][split_name]
             pairs, labels = _pairs_and_labels(rows)
             predictions = model.score(embeddings, pairs).sigmoid()
@@ -431,6 +473,7 @@ def main() -> None:
     train_parser.add_argument("--hidden", type=int, default=32)
     train_parser.add_argument("--epochs", type=int, default=100)
     train_parser.add_argument("--folds", type=int, default=5)
+    train_parser.add_argument("--patience", type=int, default=10)
     train_parser.add_argument("--lr", type=float, default=0.01)
     train_parser.add_argument("--seed", type=int, default=42)
 
