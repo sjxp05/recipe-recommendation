@@ -110,7 +110,8 @@ def prepare(args) -> None:
                 found = db.execute("SELECT assembly FROM recipes WHERE id=?", (rid,)).fetchone()
                 if found is None:
                     raise ValueError(f"assembly database lacks recipe {rid}")
-                views = make_views(recipes[rid], found[0], cache[rid], helpers, mapping)
+                views = make_views(recipes[rid], found[0], cache[rid], helpers, mapping,
+                                   drop_raw_other=args.drop_raw_other)
                 for view, text in views.items():
                     handles[view].write(json.dumps({"id": rid, "text": text}, ensure_ascii=False) + "\n")
                 if index % 250 == 0 or index == len(ids):
@@ -120,6 +121,8 @@ def prepare(args) -> None:
             handle.close()
     manifest = {"schema": "stage1-views-v1", "recipe_ids": ids,
                 "splits": splits, "seed": 42, "dimension": DIMENSION,
+                "view_options": {"drop_null_fields": True,
+                                 "drop_raw_other": args.drop_raw_other},
                 "sources": {name: {"path": str(path.resolve()), "sha256": sha256(path)}
                             for name, path in (("pairs", args.pairs),
                                                ("assembly_db", args.assembly_db),
@@ -299,6 +302,7 @@ def main() -> None:
     prepare_parser.add_argument("--assembly-db", type=Path, required=True)
     prepare_parser.add_argument("--masked-cache", type=Path, required=True)
     prepare_parser.add_argument("--id-map", type=Path, required=True)
+    prepare_parser.add_argument("--drop-raw-other", action="store_true")
     for command in (prepare_parser,):
         command.add_argument("--out", type=Path, required=True)
     for action in ("encode", "fit"):

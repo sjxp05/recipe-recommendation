@@ -39,7 +39,7 @@ are saved with each feature artifact and in `results.csv`.
 
 Run from the repository root. Replace `$pairs` with the current labeled-pair
 CSV path. `prepare` creates texts only; `encode` downloads/loads the selected
-models; `fit` trains and evaluates all four views per selected encoder.
+models; `fit` trains and evaluates the selected views per encoder.
 
 ```powershell
 $project = 'E:\대학\과제\3학년\소프트웨어응용'
@@ -59,6 +59,14 @@ $meanOut = Join-Path $project '구현\graphsage_assembly_20261029\stage1_matrix_
 python -m training.stage1_null_ablation --source $out --out $meanOut
 python -m training.stage1_report --out $meanOut --views assembly assembly_masked --pooling mean
 ```
+
+For the RAW/`other` ablation, use a fresh output directory and add
+`--drop-raw-other` to `prepare`. This deletes complete `RAW` records and every
+JSON `other` field after null removal, without changing the remaining `OP`
+order. Encode only `assembly assembly_masked`. Then run
+`training.stage1_null_ablation` on those artifacts for the mean-pooling test.
+Running `stage1_matrix fit --views assembly assembly_masked` is the optional
+ordered-GRU comparison; it is not required for the mean-pooling test.
 
 For example, `--encoders gte` runs one encoder; multiple names select multiple
 encoders. The encoded feature artifacts are cached. A checkpoint is reused only

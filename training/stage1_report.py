@@ -28,6 +28,7 @@ def make_report(out: Path, views: tuple[str, ...] = tuple(VIEWS),
     if rows.keys() != expected:
         raise ValueError(f"expected {len(expected)} conditions; missing={expected - rows.keys()}; extra={rows.keys() - expected}")
     manifest = json.loads((out / "manifest.json").read_text(encoding="utf-8"))
+    drop_raw_other = manifest.get("view_options", {}).get("drop_raw_other", False)
     splits = manifest["splits"]
     n_test = len(splits["test"])
     total = sum(map(len, splits.values()))
@@ -47,6 +48,8 @@ def make_report(out: Path, views: tuple[str, ...] = tuple(VIEWS),
     ]
     if set(views) != set(VIEWS):
         note = "이번 재평가는 지정한 어셈블리 입력만 대상으로 한다. 원본·일반 마스킹은 다시 학습하지 않았다."
+        if drop_raw_other:
+            note += " 어셈블리에서 RAW 줄과 모든 JSON other 필드도 제거했다."
         if pooling == "gru":
             note += " 기존 원본·일반 마스킹 결과와는 모델 구조가 달라 수치를 직접 비교하지 않는다."
         lines.insert(4, note)
@@ -84,6 +87,7 @@ def make_report(out: Path, views: tuple[str, ...] = tuple(VIEWS),
     lines.extend([
         "", "## 해석 범위", "",
         "쌍 단위 분할이므로 같은 레시피가 학습과 테스트의 서로 다른 쌍에 나타날 수 있다. 마스킹 태그를 만든 v5 모델의 학습 재료에도 일부 레시피가 포함됐다. 따라서 새로운 레시피에 대한 일반화 성능을 직접 측정한 결과는 아니다. 어셈블리 JSON의 null 필드를 제거했다. " +
+        ("RAW 줄과 모든 JSON other 필드도 제거했다. " if drop_raw_other else "") +
         ("긴 입력은 인코더별 토큰 한도에 맞춰 나눠 임베딩한 뒤 GRU가 구간을 순서대로 읽었다."
          if pooling == "gru" else
          "긴 입력은 인코더별 토큰 한도에 맞춰 나눠 임베딩하고 토큰 수 가중 평균했다. 이 방식은 구간 사이의 순서를 보존하지 않는다."),

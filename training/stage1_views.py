@@ -132,6 +132,27 @@ def prune_null_fields(source: str) -> str:
     return "\n".join(lines) + "\n"
 
 
+def drop_raw_and_other(source: str) -> str:
+    """Remove RAW records and every JSON `other` key, preserving OP order."""
+    def clean(value):
+        if isinstance(value, dict):
+            return {key: clean(item) for key, item in value.items() if key != "other"}
+        if isinstance(value, list):
+            return [clean(item) for item in value]
+        return value
+
+    lines = []
+    for line in source.splitlines():
+        if line.startswith("RAW "):
+            continue
+        match = re.match(r"^(RECIPE|OP|ING I\d+) (.+)$", line)
+        if match:
+            line = match[1] + " " + json.dumps(clean(json.loads(match[2])),
+                                              ensure_ascii=False, separators=(",", ":"))
+        lines.append(line)
+    return "\n".join(lines) + "\n"
+
+
 def masked_assembly(source: str, tags: list[tuple], patterns, redact) -> str:
     tag_by_slot = {slot: mask for slot, _, _, _, mask in tags}
 
@@ -170,7 +191,8 @@ def masked_assembly(source: str, tags: list[tuple], patterns, redact) -> str:
     return result
 
 
-def make_views(recipe: dict, source: str, cached: tuple, helpers, mapping):
+def make_views(recipe: dict, source: str, cached: tuple, helpers, mapping,
+               drop_raw_other: bool = False):
     alias_patterns, read_assembly, redact, _, compact_assembly = helpers
     tags, cached_ids = cached
     parsed = read_assembly(source)
@@ -191,6 +213,8 @@ def make_views(recipe: dict, source: str, cached: tuple, helpers, mapping):
     if any(line.startswith("STEP ") for line in assembly.splitlines()):
         assembly = compact_assembly(assembly)
     assembly = prune_null_fields(assembly)
+    if drop_raw_other:
+        assembly = drop_raw_and_other(assembly)
     assembly_masked = masked_assembly(assembly, tags, patterns, redact)
     return {"raw": raw, "masked": masked, "assembly": assembly,
             "assembly_masked": assembly_masked}

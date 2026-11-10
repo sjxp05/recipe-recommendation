@@ -2,10 +2,26 @@ import json
 import re
 import unittest
 
-from training.stage1_views import masked_assembly, prune_null_fields, unified_assembly
+from training.stage1_views import (drop_raw_and_other, masked_assembly,
+                                   prune_null_fields, unified_assembly)
 
 
 class Stage1ViewsTests(unittest.TestCase):
+    def test_drop_raw_and_other_keeps_remaining_operations_in_order(self):
+        source = ('RECIPE {"name":"soup"}\n'
+                  'ING I0 {"source":"onion","unified_id":10}\n'
+                  'OP {"verb":"chop","other":"with a knife",'
+                  '"clauses":[{"marker":"then","other":"finely","time":0}]}\n'
+                  'RAW {"raw":"unparsed instruction"}\n'
+                  'OP {"verb":"boil","time":10}\n')
+        result = drop_raw_and_other(source)
+        self.assertEqual([line.split(" ", 1)[0] for line in result.splitlines()],
+                         ["RECIPE", "ING", "OP", "OP"])
+        self.assertEqual(json.loads(result.splitlines()[2][3:]),
+                         {"verb": "chop", "clauses": [{"marker": "then", "time": 0}]})
+        self.assertEqual(json.loads(result.splitlines()[3][3:]),
+                         {"verb": "boil", "time": 10})
+
     def test_prune_null_fields_preserves_operation_order_and_values(self):
         source = ('RECIPE {"name":"soup"}\n'
                   'ING I0 {"source":"onion","unified_id":null}\n'
