@@ -149,26 +149,68 @@ def prepare(args: argparse.Namespace) -> None:
         )
 
 
-def _graph(features: torch.Tensor, context_rows: list[tuple[int, int, int]]):
+def _graph(features: torch.Tensor, context_rows: list[tuple[int, int, int]],
+           window_features: torch.Tensor | None = None,
+           window_counts: torch.Tensor | None = None):
     from torch_geometric.data import HeteroData
     from src.engine import SIMILAR
 
     data = HeteroData()
     data["Recipe"].x = features
+    if window_features is not None:
+        if window_counts is None:
+            raise ValueError("ordered windows require counts")
+        data["Recipe"].window_features = window_features
+        data["Recipe"].window_counts = window_counts
     data[SIMILAR].edge_index, data[SIMILAR].edge_weight = _context_edges(context_rows)
     return data
+
+
+def _artifact_graph(artifact: dict, context_rows: list[tuple[int, int, int]]):
+    if "window_features" in artifact:
+        return _graph(artifact["recipe_features"], context_rows,
+                      artifact["window_features"], artifact["window_counts"])
+    return _graph(artifact["recipe_features"], context_rows)
+
+
+def _artifact_model(artifact: dict, hidden: int):
+    if "window_features" in artifact:
+        from src.engine import OrderedRecipeEncoder as model_class
+    else:
+        from src.engine import RecipeEncoder as model_class
+    return model_class(artifact["recipe_features"].shape[1], hidden)
+
+
+def _checkpoint_model(artifact: dict, saved: dict):
+    features = artifact["recipe_features"]
+    if (saved["recipe_features"] != features.shape[1]
+            or saved["data_seed"] != artifact["seed"]
+            or saved.get("ordered_windows", False) != ("window_features" in artifact)):
+        raise ValueError("checkpoint does not match the feature artifact")
+    model = _artifact_model(artifact, saved["hidden"])
+    model.load_state_dict(saved["model"])
+    model.eval()
+    return model
 
 
 def _load_artifact(path: Path) -> dict:
     artifact = torch.load(path, map_location="cpu", weights_only=True)
     if not isinstance(artifact["recipe_features"], torch.Tensor):
         raise ValueError("invalid stage-1 feature artifact")
+    if "window_features" in artifact:
+        windows = artifact["window_features"]
+        counts = artifact.get("window_counts")
+        if (not isinstance(windows, torch.Tensor) or windows.ndim != 3
+                or windows.shape[0] != len(artifact["recipe_features"])
+                or windows.shape[2] != artifact["recipe_features"].shape[1]
+                or not isinstance(counts, torch.Tensor)
+                or counts.shape != (windows.shape[0],)
+                or (counts < 1).any() or (counts > windows.shape[1]).any()):
+            raise ValueError("invalid ordered windows in stage-1 artifact")
     return artifact
 
 
 def train(args: argparse.Namespace) -> None:
-    from src.engine import RecipeEncoder
-
     artifact = _load_artifact(args.data)
     features = artifact["recipe_features"]
     train_rows = artifact["splits"]["train"]
@@ -182,9 +224,9 @@ def train(args: argparse.Namespace) -> None:
     if args.folds < 2 or args.epochs < 1 or args.patience < 1:
         raise ValueError("folds must be >= 2; epochs and patience must be >= 1")
     rng = random.Random(args.seed)
-    model = RecipeEncoder(features.shape[1], args.hidden)
+    model = _artifact_model(artifact, args.hidden)
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
-    val_data = _graph(features, train_rows)
+    val_data = _artifact_graph(artifact, train_rows)
     val_pairs, val_labels = _pairs_and_labels(val_rows)
     best_val_rmse = float("inf")
     best_epoch = 0
@@ -205,7 +247,7 @@ def train(args: argparse.Namespace) -> None:
             context = _fold_context(train_rows, selected)
             targets = [train_rows[i] for i in selected]
             pairs, labels = _pairs_and_labels(targets)
-            data = _graph(features, context)
+            data = _artifact_graph(artifact, context)
             optimizer.zero_grad()
             predictions = model.score(model(data), pairs).sigmoid()
             # 학습 손실과 출력 오차를 모두 정규화된 0~1 척도 RMSE로 계산
@@ -238,6 +280,7 @@ def train(args: argparse.Namespace) -> None:
                     "best_epoch": best_epoch,
                     "best_val_rmse": best_val_rmse,
                     "best_train_rmse": train_rmse,
+                    "ordered_windows": "window_features" in artifact,
                 },
                 args.output,
             )
@@ -305,22 +348,12 @@ def _write_prediction_rows(
 
 
 def evaluate(args: argparse.Namespace) -> None:
-    from src.engine import RecipeEncoder
-
     artifact = _load_artifact(args.data)
-    features = artifact["recipe_features"]
     saved = torch.load(args.checkpoint, map_location="cpu", weights_only=True)
-    if (
-        saved["recipe_features"] != features.shape[1]
-        or saved["data_seed"] != artifact["seed"]
-    ):
-        raise ValueError("checkpoint does not match the feature artifact")
-    model = RecipeEncoder(features.shape[1], saved["hidden"])
-    model.load_state_dict(saved["model"])
-    model.eval()
+    model = _checkpoint_model(artifact, saved)
     # 입력 그래프에서 검증·테스트 연결 제외
     # 직접 연결되지 않은 쌍도 레시피별 텍스트 특징으로 점수 계산
-    data = _graph(features, artifact["splits"]["train"])
+    data = _artifact_graph(artifact, artifact["splits"]["train"])
     args.output.parent.mkdir(parents=True, exist_ok=True)
     print("변환 기준: 예측 유사도 × 4를 반올림해 0~4점으로 변환, 2점 이상은 유사 쌍")
     with torch.no_grad(), args.output.open("w", encoding="utf-8", newline="") as handle:
@@ -354,8 +387,6 @@ def evaluate(args: argparse.Namespace) -> None:
 
 
 def predict(args: argparse.Namespace) -> None:
-    from src.engine import RecipeEncoder
-
     artifact = _load_artifact(args.data)
     ids = {
         str(recipe_id): index for index, recipe_id in enumerate(artifact["recipe_ids"])
@@ -364,17 +395,9 @@ def predict(args: argparse.Namespace) -> None:
     missing = [recipe_id for recipe_id in (a_id, b_id) if recipe_id not in ids]
     if missing:
         raise ValueError(f"recipe ID absent from stage1.pt: {', '.join(missing)}")
-    features = artifact["recipe_features"]
     saved = torch.load(args.checkpoint, map_location="cpu", weights_only=True)
-    if (
-        saved["recipe_features"] != features.shape[1]
-        or saved["data_seed"] != artifact["seed"]
-    ):
-        raise ValueError("checkpoint does not match the feature artifact")
-    model = RecipeEncoder(features.shape[1], saved["hidden"])
-    model.load_state_dict(saved["model"])
-    model.eval()
-    data = _graph(features, artifact["splits"]["train"])
+    model = _checkpoint_model(artifact, saved)
+    data = _artifact_graph(artifact, artifact["splits"]["train"])
     pair = torch.tensor([[ids[a_id]], [ids[b_id]]], dtype=torch.long)
     with torch.no_grad():
         similarity = model.score(model(data), pair).sigmoid().item()
@@ -401,8 +424,6 @@ def rank_similar_recipes(
 
 
 def top_similar(args: argparse.Namespace) -> None:
-    from src.engine import RecipeEncoder
-
     artifact = _load_artifact(args.data)
     recipe_ids = [str(recipe_id) for recipe_id in artifact["recipe_ids"]]
     recipe_id = str(args.recipe_id).strip()
@@ -412,17 +433,9 @@ def top_similar(args: argparse.Namespace) -> None:
     if args.top_k < 1:
         raise ValueError("top_k must be positive")
 
-    features = artifact["recipe_features"]
     saved = torch.load(args.checkpoint, map_location="cpu", weights_only=True)
-    if (
-        saved["recipe_features"] != features.shape[1]
-        or saved["data_seed"] != artifact["seed"]
-    ):
-        raise ValueError("checkpoint does not match the feature artifact")
-    model = RecipeEncoder(features.shape[1], saved["hidden"])
-    model.load_state_dict(saved["model"])
-    model.eval()
-    data = _graph(features, artifact["splits"]["train"])
+    model = _checkpoint_model(artifact, saved)
+    data = _artifact_graph(artifact, artifact["splits"]["train"])
     names = {row["id"]: row["name"] for row in unique_recipes(_read_csv(args.recipes))}
     if recipe_id not in names:
         raise ValueError(f"recipe ID absent from recipe CSV: {recipe_id}")

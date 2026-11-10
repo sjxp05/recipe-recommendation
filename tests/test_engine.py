@@ -11,6 +11,7 @@ from src.engine import (
     REV_CONTRIBUTION,
     SIMILAR,
     IngredientLinkEncoder,
+    OrderedRecipeEncoder,
     RecipeEncoder,
     WeightedSAGEConv,
     find_recipes_by_ingredient,
@@ -36,6 +37,18 @@ def train_toy_recipe_encoder(data):
 
 
 class EngineTests(unittest.TestCase):
+    def test_ordered_recipe_encoder_distinguishes_reversed_windows(self):
+        from training.stage1 import _graph
+
+        windows = torch.tensor([[[1.0, 0.0], [0.0, 1.0]],
+                                [[0.0, 1.0], [1.0, 0.0]]])
+        data = _graph(windows.mean(1), [], windows, torch.tensor([2, 2]))
+        torch.manual_seed(7)
+        model = OrderedRecipeEncoder(2, 8)
+        with torch.no_grad():
+            embeddings = model(data)
+        self.assertFalse(torch.allclose(embeddings[0], embeddings[1]))
+
     def test_two_stages_rank_unseen_links_and_freeze_recipe_encoder(self):
         torch.manual_seed(7)
         data, targets = load_dataset(EXAMPLE)

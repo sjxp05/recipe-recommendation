@@ -113,6 +113,25 @@ def unified_assembly(source: str, mapping) -> str:
     return "\n".join(lines) + "\n"
 
 
+def prune_null_fields(source: str) -> str:
+    """Remove absent JSON fields without changing line or operation order."""
+    def prune(value):
+        if isinstance(value, dict):
+            return {key: prune(item) for key, item in value.items() if item is not None}
+        if isinstance(value, list):
+            return [prune(item) for item in value]
+        return value
+
+    lines = []
+    for line in source.splitlines():
+        match = re.match(r"^(RECIPE|OP|RAW|ING I\d+) (.+)$", line)
+        if match:
+            line = match[1] + " " + json.dumps(prune(json.loads(match[2])),
+                                              ensure_ascii=False, separators=(",", ":"))
+        lines.append(line)
+    return "\n".join(lines) + "\n"
+
+
 def masked_assembly(source: str, tags: list[tuple], patterns, redact) -> str:
     tag_by_slot = {slot: mask for slot, _, _, _, mask in tags}
 
@@ -171,6 +190,7 @@ def make_views(recipe: dict, source: str, cached: tuple, helpers, mapping):
     assembly = unified_assembly(source, mapping)
     if any(line.startswith("STEP ") for line in assembly.splitlines()):
         assembly = compact_assembly(assembly)
+    assembly = prune_null_fields(assembly)
     assembly_masked = masked_assembly(assembly, tags, patterns, redact)
     return {"raw": raw, "masked": masked, "assembly": assembly,
             "assembly_masked": assembly_masked}

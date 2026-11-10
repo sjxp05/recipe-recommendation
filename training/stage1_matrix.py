@@ -23,7 +23,7 @@ if sys.platform == "win32":
 import torch
 import torch.nn.functional as F
 
-from training.stage1 import (_graph, _load_artifact, _pairs_and_labels,
+from training.stage1 import (_artifact_graph, _checkpoint_model, _load_artifact, _pairs_and_labels,
                              evaluate as evaluate_stage1, score_metrics,
                              train as train_stage1)
 from training.stage1_views import (VIEWS, load_assembly_helpers,
@@ -38,7 +38,7 @@ ENCODERS = {
     "distilroberta": ("sentence-transformers/all-distilroberta-v1", ""),
 }
 DIMENSION = 768
-ENCODING_STRATEGY = "token_window_weighted_mean_v1"
+ENCODING_STRATEGY = "ordered_token_windows_v1"
 
 
 def sha256(path: Path) -> str:
@@ -136,12 +136,13 @@ def encode(args) -> None:
 
     manifest = read_manifest(args.out)
     names = args.encoders or list(ENCODERS)
+    views = args.views or VIEWS
     for name in names:
         model_name, prefix = ENCODERS[name]
         model = SentenceTransformer(model_name)
         if model.get_sentence_embedding_dimension() != DIMENSION:
             raise ValueError(f"{name} is not {DIMENSION}-dimensional")
-        for view in VIEWS:
+        for view in views:
             path = args.out / "texts" / f"{view}.jsonl"
             if sha256(path) != manifest["texts"][view]:
                 raise ValueError(f"text view changed since prepare: {view}")
@@ -155,7 +156,8 @@ def encode(args) -> None:
                 if (saved.get("text_sha256") != manifest["texts"][view]
                         or saved.get("encoder") != model_name
                         or saved.get("encoding_strategy") != ENCODING_STRATEGY
-                        or saved["recipe_features"].shape != (len(rows), DIMENSION)):
+                        or saved["recipe_features"].shape != (len(rows), DIMENSION)
+                        or "window_features" not in saved):
                     raise ValueError(f"stale artifact at {destination}; use --overwrite")
                 print(f"reused {destination}")
                 continue
@@ -170,10 +172,12 @@ def encode(args) -> None:
                                     show_progress_bar=False, convert_to_tensor=True,
                                     normalize_embeddings=True).detach().cpu().float()
             features = []
+            window_features = torch.zeros((len(rows), max(counts), DIMENSION), dtype=torch.float32)
             cursor = 0
-            for parts in windows:
+            for index, parts in enumerate(windows):
                 weights = torch.tensor([weight for _, weight in parts], dtype=torch.float32)
                 vectors = encoded[cursor:cursor + len(parts)]
+                window_features[index, :len(parts)] = vectors
                 features.append(F.normalize((vectors * weights[:, None]).sum(0), dim=0))
                 cursor += len(parts)
             features = torch.stack(features)
@@ -181,6 +185,8 @@ def encode(args) -> None:
                 raise ValueError(f"invalid embeddings for {view}/{name}")
             destination.parent.mkdir(exist_ok=True)
             torch.save({"recipe_ids": manifest["recipe_ids"], "recipe_features": features,
+                        "window_features": window_features,
+                        "window_counts": torch.tensor(counts, dtype=torch.long),
                         "splits": manifest["splits"], "seed": manifest["seed"],
                         "encoder": model_name, "view": view,
                         "text_sha256": manifest["texts"][view],
@@ -192,19 +198,12 @@ def encode(args) -> None:
 
 
 def test_metrics(artifact_path: Path, checkpoint_path: Path) -> dict:
-    from src.engine import RecipeEncoder
-
     artifact = _load_artifact(artifact_path)
     saved = torch.load(checkpoint_path, map_location="cpu", weights_only=True)
-    features = artifact["recipe_features"]
-    if saved["recipe_features"] != DIMENSION or saved["data_seed"] != artifact["seed"]:
-        raise ValueError("checkpoint and feature artifact do not match")
-    model = RecipeEncoder(DIMENSION, saved["hidden"])
-    model.load_state_dict(saved["model"])
-    model.eval()
+    model = _checkpoint_model(artifact, saved)
     pairs, labels = _pairs_and_labels(artifact["splits"]["test"])
     with torch.no_grad():
-        scores = model.score(model(_graph(features, artifact["splits"]["train"])), pairs).sigmoid()
+        scores = model.score(model(_artifact_graph(artifact, artifact["splits"]["train"])), pairs).sigmoid()
     metrics = score_metrics(scores, labels)
     return {"test_pairs": len(labels),
             "train_rmse_0_1": saved["best_train_rmse"],
@@ -228,6 +227,7 @@ def fit(args) -> None:
     torch.set_num_threads(1)
     torch.use_deterministic_algorithms(True)
     manifest = read_manifest(args.out)
+    views = args.views or VIEWS
     result_path = args.out / "results.csv"
     if result_path.exists():
         with result_path.open(encoding="utf-8", newline="") as handle:
@@ -235,7 +235,7 @@ def fit(args) -> None:
     else:
         results = {}
     for name in args.encoders or ENCODERS:
-        for view in VIEWS:
+        for view in views:
             artifact = args.out / "artifacts" / f"{view}__{name}.pt"
             if not artifact.is_file():
                 raise FileNotFoundError(f"run encode first: {artifact}")
@@ -244,14 +244,16 @@ def fit(args) -> None:
                     or saved["splits"] != manifest["splits"]
                     or saved["text_sha256"] != manifest["texts"][view]
                     or saved["encoder"] != ENCODERS[name][0]
-                    or saved["recipe_features"].shape[1] != DIMENSION):
+                    or saved["recipe_features"].shape[1] != DIMENSION
+                    or saved.get("encoding_strategy") != ENCODING_STRATEGY):
                 raise ValueError(f"incomparable artifact: {artifact}")
             checkpoint = args.out / "checkpoints" / f"{view}__{name}.pt"
             predictions = args.out / "predictions" / f"{view}__{name}.csv"
             provenance = checkpoint.with_suffix(".json")
             settings = {"artifact_sha256": sha256(artifact), "train_seed": args.train_seed,
                         "hidden": args.hidden, "epochs": args.epochs, "folds": args.folds,
-                        "patience": args.patience, "lr": args.lr}
+                        "patience": args.patience, "lr": args.lr,
+                        "sequence_pooling": "gru_v1"}
             if checkpoint.exists() and not args.overwrite:
                 if not provenance.exists() or json.loads(provenance.read_text(encoding="utf-8")) != settings:
                     raise ValueError(f"checkpoint provenance differs: {checkpoint}; use --overwrite")
@@ -303,6 +305,7 @@ def main() -> None:
         sub = commands.add_parser(action)
         sub.add_argument("--out", type=Path, required=True)
         sub.add_argument("--encoders", nargs="+", choices=list(ENCODERS))
+        sub.add_argument("--views", nargs="+", choices=list(VIEWS))
         sub.add_argument("--overwrite", action="store_true")
         if action == "encode":
             sub.add_argument("--batch-size", type=int, default=32)

@@ -3,7 +3,8 @@
 This experiment covers only recipe text, a 768-dimensional sentence encoder,
 and the existing stage-1 GraphSAGE. It uses the same 0–4 labeled pairs, recipe
 order, train/validation/test split, graph construction, and training settings
-for every condition. There are four views and six encoders: 24 runs.
+for every condition. The original matrix had four views and six encoders.
+This null-pruned, order-aware rerun targets the two assembly views: 12 runs.
 
 | View | Encoder input |
 | --- | --- |
@@ -27,8 +28,12 @@ Encoders: `BAAI/bge-base-en-v1.5`, `intfloat/e5-base-v2`,
 `sentence-transformers/all-distilroberta-v1`. Both E5 models receive their
 documented `query: ` prefix for symmetric similarity. All outputs must be
 exactly 768 dimensions.
-Long inputs are split into token-bounded windows; all windows are encoded,
-combined by token-count-weighted mean, and normalized back to 768 dimensions.
+Null-valued JSON fields are removed recursively from both assembly views.
+Long inputs are split into token-bounded windows; all windows are encoded as
+768-dimensional vectors. A trainable GRU reads those vectors in their original
+order before GraphSAGE, so crossing a token-window boundary does not discard
+the order of cooking operations. The weighted-mean vector remains in each
+artifact for diagnostics but is not used by the ordered model.
 The number of recipes requiring multiple windows and the total window count
 are saved with each feature artifact and in `results.csv`.
 
@@ -39,11 +44,20 @@ models; `fit` trains and evaluates all four views per selected encoder.
 ```powershell
 $project = 'E:\대학\과제\3학년\소프트웨어응용'
 $pairs = 'C:\Users\fjghq\Downloads\recipe_similarity_manual_20261106\labeled_pairs_jihee_plus_codex_3192.csv'
-$out = Join-Path $project '구현\graphsage_assembly_20261029\stage1_matrix_texts'
+$out = Join-Path $project '구현\graphsage_assembly_20261029\stage1_matrix_null_pruned'
 python -m training.stage1_matrix prepare --project-root $project --pairs $pairs --assembly-db (Join-Path $project '데이터\recipe_assembly_v5.sqlite') --masked-cache (Join-Path $project '구현\labeled_pairs_jihee_masked_v5.csv') --id-map (Join-Path $project '데이터\ingredient_ids_reviewed\output\ingredient_name_old_new_simple.csv') --out $out
-python -m training.stage1_matrix encode --out $out
-python -m training.stage1_matrix fit --out $out
-python -m training.stage1_report --out $out
+python -m training.stage1_matrix encode --out $out --views assembly assembly_masked
+python -m training.stage1_matrix fit --out $out --views assembly assembly_masked
+python -m training.stage1_report --out $out --views assembly assembly_masked --pooling gru
+```
+
+To isolate null removal from the change to ordered pooling, reuse the same
+null-pruned window encodings with the old weighted mean and GraphSAGE model:
+
+```powershell
+$meanOut = Join-Path $project '구현\graphsage_assembly_20261029\stage1_matrix_null_only'
+python -m training.stage1_null_ablation --source $out --out $meanOut
+python -m training.stage1_report --out $meanOut --views assembly assembly_masked --pooling mean
 ```
 
 For example, `--encoders gte` runs one encoder; multiple names select multiple
@@ -54,7 +68,7 @@ when its feature artifact and training settings match its saved provenance;
 `fit` writes each checkpoint, a test-pair prediction CSV, and a `results.csv`
 containing train/validation/test RMSE, MAE, exact and within-one accuracy,
 positive-pair precision/recall/F1, balanced accuracy, a 5×5 confusion matrix,
-best epoch, and window counts. `stage1_report` writes the complete 24-condition
+best epoch, and window counts. `stage1_report` writes the selected condition
 table and confusion matrices to `RESULTS.md`. The 3,192-pair source uses
 pair-level splits, so recipes can occur in more than one split. The v5 tagger
 has its own training history; these comparisons measure this fixed pipeline and do not constitute

@@ -2,10 +2,27 @@ import json
 import re
 import unittest
 
-from training.stage1_views import masked_assembly, unified_assembly
+from training.stage1_views import masked_assembly, prune_null_fields, unified_assembly
 
 
 class Stage1ViewsTests(unittest.TestCase):
+    def test_prune_null_fields_preserves_operation_order_and_values(self):
+        source = ('RECIPE {"name":"soup"}\n'
+                  'ING I0 {"source":"onion","unified_id":null}\n'
+                  'OP {"verb":"chop","object":"@I0","time":null,"clauses":'
+                  '[{"marker":"then","temperature":null,"value":0}]}\n'
+                  'OP {"verb":"boil","time":10,"optional":false}\n')
+        result = prune_null_fields(source)
+        lines = result.splitlines()
+        self.assertEqual([line.split(" ", 1)[0] for line in lines],
+                         ["RECIPE", "ING", "OP", "OP"])
+        self.assertEqual(json.loads(lines[1].split(" ", 2)[2]), {"source": "onion"})
+        self.assertEqual(json.loads(lines[2][3:]),
+                         {"verb": "chop", "object": "@I0",
+                          "clauses": [{"marker": "then", "value": 0}]})
+        self.assertEqual(json.loads(lines[3][3:]),
+                         {"verb": "boil", "time": 10, "optional": False})
+
     def test_unified_assembly_replaces_legacy_ids(self):
         source = ('RECIPE {"name":"pork soup"}\n'
                   'ING I0 {"source":"lean pork chops","id":4207,'
