@@ -4,9 +4,10 @@ Compare the three best raw-input encoders from the previous test-RMSE table:
 MPNet, GTE, and multilingual E5. Their existing frozen sentence embeddings are
 all 768-dimensional. Only the GraphSAGE hidden/output width changes:
 16, 32, 64, 128, and 256. This gives 15 conditions. The width-32 checkpoints
-and their metrics are imported from the earlier run; 12 conditions remain to
-train. All conditions use the same recipe order, pair split, seed, fold schedule,
-learning rate, maximum epochs, and early-stopping patience: seed 42, five folds,
+and their metrics are imported from the earlier run; the other 12 conditions
+were trained in the prepared output directory. All conditions use the same
+recipe order, pair split, seed, fold schedule, learning rate, maximum epochs,
+and early-stopping patience: seed 42, five folds,
 learning rate 0.01, at most 100 epochs, and patience 10.
 
 Run from the repository root with the project Python:
@@ -25,7 +26,7 @@ and saved test metrics. It writes `plan.json` and a 15-row `results.csv`: three
 encodes text or trains a model. This plan has already been created in the output
 directory above; choose a fresh directory if you want to create another plan.
 
-When training is requested later, run:
+To train pending conditions in a fresh plan or regenerate the report, run:
 
 ```powershell
 & $python -m training.stage1_hidden_sweep run --out $out
@@ -36,4 +37,5 @@ When training is requested later, run:
 subset. Width 32 cannot be passed to `run`. Checkpoints, predictions, and logs
 use both encoder and width in their filenames, so no previous result is
 overwritten. `report` requires all 15 rows to be complete before writing the
-metrics table and confusion matrices.
+metrics table and confusion matrices. The current output has three `existing`
+and twelve `complete` rows; its full results are in `RESULTS.md`.
