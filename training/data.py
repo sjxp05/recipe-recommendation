@@ -27,8 +27,8 @@ from src.engine import (
 )
 from training.stage1 import _context_edges
 
-STAGE1_EMBEDDINGS = Path("data/stage1/v3/stage1_embeddings_v3.pt")
-STAGE2_EMBEDDINGS = Path("data/stage2/stage2_embeddings.pt")
+STAGE1_EMBEDDINGS = Path("artifacts/stage1_embeddings.pt")
+STAGE2_EMBEDDINGS = Path("artifacts/stage2_embeddings.pt")
 
 ContributionRow = tuple[str, str, float]  # (원본 레시피 ID, 재료 이름, 기여도)
 
@@ -51,7 +51,9 @@ def read_ingredients(
         if categories.setdefault(name, category) != category:
             raise ValueError(f"ingredient has two categories: {name}")
     names = set(categories)
-    names.update(_normalize_name(row["ingredient"]) for row in _read_csv(contribution_path))
+    names.update(
+        _normalize_name(row["ingredient"]) for row in _read_csv(contribution_path)
+    )
     ordered = sorted(names)
     return ordered, [categories.get(name, "") for name in ordered]
 
@@ -107,7 +109,9 @@ def prepare_stage2(
     features = encode(
         [ingredient_text(name, category) for name, category in zip(names, categories)]
     )
-    splits = split_contributions(read_contributions(contribution_path), seed, test_ratio)
+    splits = split_contributions(
+        read_contributions(contribution_path), seed, test_ratio
+    )
     return {
         "ingredient_names": names,
         "ingredient_categories": categories,
@@ -155,10 +159,13 @@ def build_graph(
     if len(recipe_ids) != len(recipe_features):
         raise ValueError("recipe_ids must have one entry per recipe feature row")
     if len(ingredient_names) != len(ingredient_features):
-        raise ValueError("ingredient_names must have one entry per ingredient feature row")
+        raise ValueError(
+            "ingredient_names must have one entry per ingredient feature row"
+        )
     recipe_count, ingredient_count = len(recipe_features), len(ingredient_features)
     if any(
-        not (0 <= a < recipe_count and 0 <= b < recipe_count) for a, b, _ in similar_rows
+        not (0 <= a < recipe_count and 0 <= b < recipe_count)
+        for a, b, _ in similar_rows
     ):
         raise ValueError("out-of-range graph edge in SIMILAR")
     if contribution_pairs.numel() and (
@@ -203,10 +210,17 @@ def _index_rows(
         )
     if not rows:
         return torch.empty((2, 0), dtype=torch.long), torch.empty(0)
-    pairs = torch.tensor(
-        [(recipe_index[recipe], ingredient_index[name]) for recipe, name, _ in rows],
-        dtype=torch.long,
-    ).t().contiguous()
+    pairs = (
+        torch.tensor(
+            [
+                (recipe_index[recipe], ingredient_index[name])
+                for recipe, name, _ in rows
+            ],
+            dtype=torch.long,
+        )
+        .t()
+        .contiguous()
+    )
     return pairs, torch.tensor([weight for _, _, weight in rows], dtype=torch.float)
 
 
@@ -227,7 +241,9 @@ def load_dataset(
 
     targets = {}
     for split in ("train", "test"):
-        pairs, labels = _index_rows(stage2["splits"][split], recipe_index, ingredient_index)
+        pairs, labels = _index_rows(
+            stage2["splits"][split], recipe_index, ingredient_index
+        )
         targets[split] = {"ingredient": (pairs, labels)}
     train_keys = set(map(tuple, targets["train"]["ingredient"][0].t().tolist()))
     if any(
