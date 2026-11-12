@@ -27,7 +27,7 @@ from training.stage1 import (
 
 
 class Stage1CsvTests(unittest.TestCase):
-    def test_recipe_text_accepts_structured_json_steps(self):
+    def test_recipe_text_linearizes_structured_steps_and_nested_conditions(self):
         steps = [
             {
                 "text": None,
@@ -36,19 +36,50 @@ class Stage1CsvTests(unittest.TestCase):
                     "data": {
                         "verb": "add",
                         "object": "[MASK:I0|vegetables|composition_flavor|0.9]",
-                        "clauses": [{"marker": "if", "ops": [{"verb": "boil"}]}],
+                        "clauses": [{"marker": "if", "ops": [
+                            {"subject": "the mixture", "verb": "is", "object": "dry"},
+                            {"subject": "it", "verb": "needs", "object": "water"},
+                        ]}],
                     },
                 }],
             },
             {"text": None, "operations": [{"kind": "RAW", "data": {"raw": "simmer"}}]},
         ]
         text = recipe_text({"name": "soup", "steps": json.dumps(steps)})
-        encoded_steps = text.removeprefix("Recipe: soup. Steps: ")
-        decoder = json.JSONDecoder()
-        first, end = decoder.raw_decode(encoded_steps)
-        self.assertEqual(first, steps[0])
-        self.assertEqual(json.loads(encoded_steps[end:]), steps[1])
-        self.assertIn("simmer", text)
+        self.assertEqual(
+            text,
+            "Recipe: soup. Steps: add [MASK:I0|vegetables|composition_flavor|0.9], "
+            "if the mixture is dry and it needs water. simmer.",
+        )
+
+    def test_recipe_text_preserves_cooking_conditions_and_negation(self):
+        steps = [{"operations": [
+            {"kind": "OP", "data": {"verb": "not"}},
+            {"kind": "OP", "data": {
+                "subject": "you", "verb": "bake", "object": "the mixture",
+                "location": "in the oven", "time": "for 20 minutes",
+                "temperature": "180 degrees", "other": None,
+            }},
+            {"kind": "OP", "data": {
+                "verb": "until",
+                "clauses": [{"marker": "until", "text": "set but not browned"}],
+            }},
+        ]}]
+        self.assertEqual(
+            recipe_text({"name": "cake", "steps": json.dumps(steps)}),
+            "Recipe: cake. Steps: not bake the mixture in the oven for 20 minutes "
+            "at 180 degrees; until set but not browned.",
+        )
+
+    def test_recipe_text_preserves_raw_text_without_duplicate_temperature(self):
+        steps = [{"operations": [{"kind": "RAW", "data": {
+            "raw": "bake at 350 degrees for 40 minutes",
+            "temperature": "350 degrees",
+        }}]}]
+        self.assertEqual(
+            recipe_text({"name": "cake", "steps": json.dumps(steps)}),
+            "Recipe: cake. Steps: bake at 350 degrees for 40 minutes.",
+        )
 
     def test_recipe_text_accepts_json_string_steps_and_rejects_invalid_shapes(self):
         self.assertEqual(
@@ -58,6 +89,8 @@ class Stage1CsvTests(unittest.TestCase):
         for steps in ('null', '{}', '[1, 2]', '[null]'):
             with self.subTest(steps=steps), self.assertRaisesRegex(ValueError, "list"):
                 recipe_text({"name": "soup", "steps": steps})
+        with self.assertRaisesRegex(ValueError, "no operation or text"):
+            recipe_text({"name": "soup", "steps": '[{"text": null}]'})
 
     def test_train_stops_after_patience_and_saves_best_validation_model(self):
         class RecipeEncoder(torch.nn.Module):
@@ -130,7 +163,9 @@ class Stage1CsvTests(unittest.TestCase):
             output = Path(directory) / "predictions.csv"
             with output.open("w", encoding="utf-8", newline="") as handle:
                 writer = csv.writer(handle)
-                writer.writerow(("a_id", "b_id", "similarity", "predicted_similarity"))
+                writer.writerow(
+                    ("a_id", "b_id", "similarity", "predicted_similarity", "predicted_similarity_0_1")
+                )
                 _write_prediction_rows(
                     writer,
                     ["recipe-A", "recipe-B", "recipe-C"],
@@ -147,12 +182,14 @@ class Stage1CsvTests(unittest.TestCase):
                         "b_id": "recipe-A",
                         "similarity": "4",
                         "predicted_similarity": "3",
+                        "predicted_similarity_0_1": "0.75",
                     },
                     {
                         "a_id": "recipe-B",
                         "b_id": "recipe-C",
                         "similarity": "0",
                         "predicted_similarity": "0",
+                        "predicted_similarity_0_1": "0.125",
                     },
                 ],
             )
