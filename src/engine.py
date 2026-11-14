@@ -7,6 +7,13 @@ Recipe-Ingredient 간 연결: CONTRIBUTION (0~1 기여도)
 
 from __future__ import annotations
 
+import csv
+import math
+from collections import defaultdict
+from collections.abc import Sequence
+from functools import lru_cache
+from pathlib import Path
+
 import torch
 from torch import Tensor, nn
 from torch.nn import functional as F
@@ -18,6 +25,76 @@ CONTRIBUTION = ("Recipe", "CONTRIBUTION", "Ingredient")
 REV_CONTRIBUTION = ("Ingredient", "REV_CONTRIBUTION", "Recipe")
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+STAGE2_DATA = Path(__file__).resolve().parents[1] / "data" / "stage2"
+CONTRIBUTION_CSV = STAGE2_DATA / "ingredients_contribution.csv"
+CATEGORY_CSV = STAGE2_DATA / "ingredients_category.csv"
+
+
+def _normalize_name(name: str) -> str:
+    return name.strip().lower()
+
+
+@lru_cache(maxsize=None)
+def _read_contribution_links(path: str) -> dict[str, frozenset[str]]:
+    # 재료 이름 -> 해당 재료가 실제로 들어가는 원본 레시피 ID 집합
+    links: dict[str, set[str]] = defaultdict(set)
+    with open(path, newline="", encoding="utf-8") as file:
+        for row in csv.DictReader(file):
+            links[_normalize_name(row["ingredient"])].add(row["recipe_id"].strip())
+    return {name: frozenset(ids) for name, ids in links.items()}
+
+
+def recipes_with_ingredient(
+    ingredient_name: str,
+    recipe_ids: Sequence[str | int],
+    path: str | Path = CONTRIBUTION_CSV,
+) -> Tensor:
+    """기여도 CSV에서 재료가 실제로 들어가는 레시피를 찾아 그래프 노드 인덱스로 반환.
+
+    recipe_ids[i]는 i번 Recipe 노드의 원본 레시피 ID이며, 그래프에 없는 레시피는 무시한다.
+    """
+    linked = _read_contribution_links(str(Path(path).resolve())).get(
+        _normalize_name(ingredient_name), frozenset()
+    )
+    return torch.tensor(
+        [index for index, rid in enumerate(recipe_ids) if str(rid).strip() in linked],
+        dtype=torch.long,
+    )
+
+
+@lru_cache(maxsize=None)
+def _read_categories(path: str) -> dict[str, str]:
+    # 재료 이름 -> 카테고리
+    with open(path, newline="", encoding="utf-8") as file:
+        return {
+            _normalize_name(row["ingredient"]): row["category"].strip()
+            for row in csv.DictReader(file)
+        }
+
+
+def ingredients_in_same_category(
+    ingredient_name: str,
+    ingredient_names: Sequence[str],
+    path: str | Path = CATEGORY_CSV,
+) -> Tensor:
+    """카테고리 CSV에서 재료의 카테고리를 찾아 같은 카테고리인 재료 노드 인덱스를 반환.
+
+    ingredient_names[j]는 j번 Ingredient 노드의 재료 이름이며, 결과에는 기준 재료도 포함된다.
+    카테고리 CSV에 없는 재료 노드는 후보에서 제외한다.
+    """
+    categories = _read_categories(str(Path(path).resolve()))
+    category = categories.get(_normalize_name(ingredient_name))
+    if category is None:
+        raise ValueError(f"ingredient absent from category CSV: {ingredient_name}")
+    return torch.tensor(
+        [
+            index
+            for index, name in enumerate(ingredient_names)
+            if categories.get(_normalize_name(name)) == category
+        ],
+        dtype=torch.long,
+    )
 
 
 class BGETextEncoder:
@@ -190,101 +267,125 @@ class IngredientLinkEncoder(nn.Module):
         return self.score(data, recipe_embeddings, pairs).sigmoid()
 
     @torch.no_grad()
-    def recommend_ingredients(
+    def recommend_substitutes(
         self,
         data: HeteroData,
         recipe_embeddings: Tensor,
         recipe_id: int,
+        ingredient_id: int,
         top_k: int = 10,
-        save_predicted_edges: bool = False,
+        *,
+        original_contribution: float | None = None,
+        category_path: str | Path = CATEGORY_CSV,
     ) -> tuple[Tensor, Tensor]:
-        # 아직 연결되지 않은 재료를 예상 기여도순으로 반환
+        """원래 재료와 같은 카테고리의 재료 중 기여도 차이가 작은 순으로 반환
+
+        후보는 카테고리 CSV에서 원래 재료와 같은 카테고리인 재료로 한정하며, 레시피에 이미 연결된 재료는 제외
+        기준 기여도는 전달받은 값 -> 실제 연결의 가중치 -> 모델 예측 순으로 사용
+
+        그래프에 data["Ingredient"].ingredient_name[j] (j번 Ingredient 노드의 재료 이름)이 있어야 함
+        반환값: (후보 재료 노드 인덱스, 예측 기여도)
+        """
+        ingredient_names = getattr(data["Ingredient"], "ingredient_name", None)
+        if ingredient_names is None:
+            raise ValueError('data["Ingredient"].ingredient_name is required')
+        if len(ingredient_names) != data["Ingredient"].num_nodes:
+            raise ValueError(
+                'data["Ingredient"].ingredient_name must have one entry per Ingredient node'
+            )
         if not 0 <= recipe_id < len(recipe_embeddings):
             raise ValueError("recipe_id is outside the graph")
+        if not 0 <= ingredient_id < data["Ingredient"].num_nodes:
+            raise ValueError("ingredient_id is outside the graph")
         if top_k < 1:
             raise ValueError("top_k must be positive")
+        if original_contribution is not None and (
+            not math.isfinite(original_contribution)
+            or not 0 <= original_contribution <= 1
+        ):
+            raise ValueError("original_contribution must be finite and between 0 and 1")
 
         device = recipe_embeddings.device
-        candidates = torch.arange(data["Ingredient"].num_nodes, device=device)
-        edges = data[CONTRIBUTION].edge_index
-        connected = edges[1, edges[0] == recipe_id]
-
-        available = ~torch.isin(candidates, connected)
-        candidates = candidates[available]
+        store = data[CONTRIBUTION]
+        edges = store.edge_index
+        connected = edges[1, edges[0] == recipe_id].to(device)
+        candidates = ingredients_in_same_category(
+            ingredient_names[ingredient_id], ingredient_names, category_path
+        ).to(device)
+        candidates = candidates[
+            ~torch.isin(candidates, connected) & (candidates != ingredient_id)
+        ]
         if candidates.numel() == 0:
-            return candidates, torch.empty(0, device=device)
+            return candidates, recipe_embeddings.new_empty(0)
+
+        if original_contribution is not None:
+            reference = recipe_embeddings.new_tensor(original_contribution)
+        else:
+            original = (edges[0] == recipe_id) & (edges[1] == ingredient_id)
+            if "is_predicted" in store:
+                original &= ~store.is_predicted.bool()
+            if original.any():
+                reference = store.edge_weight[original][0].to(device)
+            else:
+                pair = torch.tensor([[recipe_id], [ingredient_id]], device=device)
+                reference = self.edge_weights(data, recipe_embeddings, pair)[0]
 
         pairs = torch.stack((torch.full_like(candidates, recipe_id), candidates))
         weights = self.edge_weights(data, recipe_embeddings, pairs)
-        values, positions = weights.topk(min(top_k, len(weights)))
-        recommended_ids = candidates[positions]
+        positions = (weights - reference).abs().argsort(stable=True)[:top_k]
+        return candidates[positions], weights[positions]
 
-        if save_predicted_edges and recommended_ids.numel() > 0:
-            store = data[CONTRIBUTION]
-            existing_edges = store.edge_index
-            edge_device = existing_edges.device or DEVICE
-            existing_count = existing_edges.shape[1]
+    @torch.no_grad()
+    def recommend_recipes(
+        self,
+        data: HeteroData,
+        recipe_embeddings: Tensor,
+        ingredient_id: int,
+        recipe_id: int,
+        top_k: int = 10,
+        *,
+        contribution_path: str | Path = CONTRIBUTION_CSV,
+    ) -> tuple[Tensor, Tensor]:
+        """ingredient_id 재료가 실제로 들어가는 레시피 중 recipe_id와 유사한 순으로 반환
 
-            old_weights = (
-                store.edge_weight
-                if "edge_weight" in store
-                else torch.ones(existing_count, dtype=torch.float, device=edge_device)
-            )
-            old_predicted = (
-                store.is_predicted.bool()
-                if "is_predicted" in store
-                else torch.zeros(existing_count, dtype=torch.bool, device=edge_device)
-            )
+        후보는 기여도 CSV(data/stage2/ingredients_contribution.csv)에 연결된 레시피로 한정
+        1단계 레시피 임베딩에서 학습한 코사인 유사도를 사용하며 기준 레시피는 제외함
 
-            new_edges = torch.stack(
-                (torch.full_like(recommended_ids, recipe_id), recommended_ids)
-            ).to(edge_device)
-            new_weights = values.to(device=edge_device, dtype=torch.float)
-            store.edge_index = torch.cat((existing_edges, new_edges), dim=1)
-            store.edge_weight = torch.cat((old_weights, new_weights))
-            store.is_predicted = torch.cat(
-                (
-                    old_predicted,
-                    torch.ones(
-                        recommended_ids.numel(), dtype=torch.bool, device=edge_device
-                    ),
-                )
+        그래프에 노드 번호와 CSV 표기의 대응이 저장되어 있어야 함
+            data["Recipe"].raw_id[i]: i번 Recipe 노드의 원본 레시피 ID (CSV의 recipe_id)
+            data["Ingredient"].ingredient_name[j]: j번 Ingredient 노드의 재료 이름 (CSV의 ingredient)
+        반환값: (후보 레시피 노드 인덱스, 코사인 유사도)
+        """
+        recipe_ids = getattr(data["Recipe"], "raw_id", None)
+        ingredient_names = getattr(data["Ingredient"], "ingredient_name", None)
+        if recipe_ids is None or ingredient_names is None:
+            raise ValueError(
+                'data["Recipe"].raw_id and data["Ingredient"].ingredient_name are required'
             )
-
-            reverse_store = data[REV_CONTRIBUTION]
-            reverse_existing_edges = reverse_store.edge_index
-            reverse_edge_device = reverse_existing_edges.device
-            reverse_count = reverse_existing_edges.shape[1]
-            reverse_old_weights = (
-                reverse_store.edge_weight
-                if "edge_weight" in reverse_store
-                else torch.ones(
-                    reverse_count, dtype=torch.float, device=reverse_edge_device
-                )
+        if not 0 <= recipe_id < len(recipe_embeddings):
+            raise ValueError("recipe_id is outside the graph")
+        if not 0 <= ingredient_id < data["Ingredient"].num_nodes:
+            raise ValueError("ingredient_id is outside the graph")
+        if top_k < 1:
+            raise ValueError("top_k must be positive")
+        if len(recipe_ids) != len(recipe_embeddings):
+            raise ValueError(
+                'data["Recipe"].raw_id must have one entry per Recipe node'
             )
-            reverse_old_predicted = (
-                reverse_store.is_predicted.bool()
-                if "is_predicted" in reverse_store
-                else torch.zeros(
-                    reverse_count, dtype=torch.bool, device=reverse_edge_device
-                )
-            )
-            reverse_store.edge_index = torch.cat(
-                (reverse_existing_edges, new_edges.flip(0).to(reverse_edge_device)),
-                dim=1,
-            )
-            reverse_store.edge_weight = torch.cat(
-                (reverse_old_weights, new_weights.to(reverse_edge_device))
-            )
-            reverse_store.is_predicted = torch.cat(
-                (
-                    reverse_old_predicted,
-                    torch.ones(
-                        recommended_ids.numel(),
-                        dtype=torch.bool,
-                        device=reverse_edge_device,
-                    ),
-                )
+        if len(ingredient_names) != data["Ingredient"].num_nodes:
+            raise ValueError(
+                'data["Ingredient"].ingredient_name must have one entry per Ingredient node'
             )
 
-        return recommended_ids, values
+        device = recipe_embeddings.device
+        candidates = recipes_with_ingredient(
+            ingredient_names[ingredient_id], recipe_ids, contribution_path
+        ).to(device)
+        candidates = candidates[candidates != recipe_id]
+        if candidates.numel() == 0:
+            return candidates, recipe_embeddings.new_empty(0)
+
+        embeddings = F.normalize(recipe_embeddings, dim=-1)
+        similarities = embeddings[candidates] @ embeddings[recipe_id]
+        positions = similarities.argsort(descending=True, stable=True)[:top_k]
+        return candidates[positions], similarities[positions]

@@ -22,23 +22,66 @@ def _read_csv(path: Path) -> list[dict[str, str]]:
         return list(csv.DictReader(handle))
 
 
+def _operation_text(data: dict) -> str:
+    clauses = data.get("clauses") or []
+    if data.get("raw"):
+        text = data["raw"].strip()
+    else:
+        # 조건만 담은 OP의 verb는 if/until 등을 한 번 더 포함함
+        clause_markers = {clause.get("marker") for clause in clauses}
+        text = " ".join(
+            data[key].strip()
+            for key in ("subject", "verb", "object", "location", "other")
+            if data.get(key)
+            and not (key == "subject" and data[key].lower() == "you")
+            and not (key == "verb" and data[key] in clause_markers)
+        )
+    for key, prefix in (("time", "for"), ("temperature", "at")):
+        value = data.get(key)
+        if value and value.lower() not in text.lower():
+            detail = (
+                value if value.lower().startswith(prefix + " ") else f"{prefix} {value}"
+            )
+            text = " ".join(filter(None, (text, detail)))
+    for clause in clauses:
+        nested = " and ".join(
+            filter(None, (_operation_text(op) for op in clause.get("ops", [])))
+        )
+        body = " ".join(filter(None, (clause.get("text"), nested)))
+        if body:
+            condition = " ".join(filter(None, (clause.get("marker"), body)))
+            text = ", ".join(filter(None, (text, condition)))
+    return text
+
+
+def _step_text(step: dict) -> str:
+    parts = []
+    for operation in step.get("operations") or []:
+        text = _operation_text(operation["data"])
+        if text:
+            # 별도 OP로 분리된 부정어는 다음 동작과 붙여서 유지
+            if parts and parts[-1] == "not":
+                parts[-1] = f"not {text}"
+            else:
+                parts.append(text)
+    text = "; ".join(parts) or (step.get("text") or "").strip()
+    if not text:
+        raise ValueError("structured step has no operation or text")
+    return text if text.endswith((".", "!", "?")) else text + "."
+
+
 def _items(value: str) -> list[str]:
     try:
         parsed = json.loads(value)
     except json.JSONDecodeError:
-        # 기존 CSV는 Python 문자열 목록, 구조화된 steps는 JSON으로 저장됨.
+        # 기존 CSV는 Python 문자열 목록, 구조화된 steps는 JSON으로 저장됨
         parsed = ast.literal_eval(value)
     if not isinstance(parsed, list) or not all(
         isinstance(item, (str, dict)) for item in parsed
     ):
         raise ValueError("expected a list of strings or step objects in recipe CSV")
-    # operations와 중첩 clauses, MASK 정보를 유지하며 BGE 입력 문자열로 변환.
-    return [
-        item if isinstance(item, str) else json.dumps(
-            item, ensure_ascii=False, separators=(",", ":")
-        )
-        for item in parsed
-    ]
+    # 구조화된 steps는 JSON 문법 대신 조리 동작과 조건을 입력으로 사용.
+    return [item if isinstance(item, str) else _step_text(item) for item in parsed]
 
 
 def recipe_text(row: dict[str, str]) -> str:
@@ -156,7 +199,7 @@ def _graph(features: torch.Tensor, context_rows: list[tuple[int, int, int]]):
     data = HeteroData()
     data["Recipe"].x = features
     data[SIMILAR].edge_index, data[SIMILAR].edge_weight = _context_edges(context_rows)
-    return data
+    return data.to(features.device)  # 연결 텐서를 특징과 같은 장치(GPU/CPU)로
 
 
 def _load_artifact(path: Path) -> dict:
@@ -167,10 +210,10 @@ def _load_artifact(path: Path) -> dict:
 
 
 def train(args: argparse.Namespace) -> None:
-    from src.engine import RecipeEncoder
+    from src.engine import DEVICE, RecipeEncoder
 
     artifact = _load_artifact(args.data)
-    features = artifact["recipe_features"]
+    features = artifact["recipe_features"].to(DEVICE)
     train_rows = artifact["splits"]["train"]
     val_rows = artifact["splits"]["val"]
     if not train_rows:
@@ -182,10 +225,11 @@ def train(args: argparse.Namespace) -> None:
     if args.folds < 2 or args.epochs < 1 or args.patience < 1:
         raise ValueError("folds must be >= 2; epochs and patience must be >= 1")
     rng = random.Random(args.seed)
-    model = RecipeEncoder(features.shape[1], args.hidden)
+    model = RecipeEncoder(features.shape[1], args.hidden).to(DEVICE)
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
     val_data = _graph(features, train_rows)
     val_pairs, val_labels = _pairs_and_labels(val_rows)
+    val_pairs, val_labels = val_pairs.to(DEVICE), val_labels.to(DEVICE)
     best_val_rmse = float("inf")
     best_epoch = 0
     stale_epochs = 0
@@ -205,6 +249,7 @@ def train(args: argparse.Namespace) -> None:
             context = _fold_context(train_rows, selected)
             targets = [train_rows[i] for i in selected]
             pairs, labels = _pairs_and_labels(targets)
+            pairs, labels = pairs.to(DEVICE), labels.to(DEVICE)
             data = _graph(features, context)
             optimizer.zero_grad()
             predictions = model.score(model(data), pairs).sigmoid()
@@ -231,7 +276,8 @@ def train(args: argparse.Namespace) -> None:
             args.output.parent.mkdir(parents=True, exist_ok=True)
             torch.save(
                 {
-                    "model": model.state_dict(),
+                    # GPU가 없는 환경에서도 읽을 수 있도록 CPU 텐서로 저장
+                    "model": {k: v.cpu() for k, v in model.state_dict().items()},
                     "hidden": args.hidden,
                     "recipe_features": features.shape[1],
                     "data_seed": artifact["seed"],
@@ -299,22 +345,26 @@ def _write_prediction_rows(
     predictions: torch.Tensor,
 ) -> None:
     predicted_scores = (predictions * 4).round().long().clamp(0, 4).tolist()
-    for (a, b, score), predicted_score in zip(rows, predicted_scores, strict=True):
-        writer.writerow((recipe_ids[a], recipe_ids[b], score, predicted_score))
+    for (a, b, score), predicted_score, similarity in zip(
+        rows, predicted_scores, predictions.tolist(), strict=True
+    ):
+        writer.writerow(
+            (recipe_ids[a], recipe_ids[b], score, predicted_score, similarity)
+        )
 
 
 def evaluate(args: argparse.Namespace) -> None:
-    from src.engine import RecipeEncoder
+    from src.engine import DEVICE, RecipeEncoder
 
     artifact = _load_artifact(args.data)
-    features = artifact["recipe_features"]
+    features = artifact["recipe_features"].to(DEVICE)
     saved = torch.load(args.checkpoint, map_location="cpu", weights_only=True)
     if (
         saved["recipe_features"] != features.shape[1]
         or saved["data_seed"] != artifact["seed"]
     ):
         raise ValueError("checkpoint does not match the feature artifact")
-    model = RecipeEncoder(features.shape[1], saved["hidden"])
+    model = RecipeEncoder(features.shape[1], saved["hidden"]).to(DEVICE)
     model.load_state_dict(saved["model"])
     model.eval()
     # 입력 그래프에서 검증·테스트 연결 제외
@@ -324,11 +374,20 @@ def evaluate(args: argparse.Namespace) -> None:
     print("변환 기준: 예측 유사도 × 4를 반올림해 0~4점으로 변환, 2점 이상은 유사 쌍")
     with torch.no_grad(), args.output.open("w", encoding="utf-8", newline="") as handle:
         writer = csv.writer(handle)
-        writer.writerow(("a_id", "b_id", "similarity", "predicted_similarity"))
+        writer.writerow(
+            (
+                "a_id",
+                "b_id",
+                "similarity",
+                "predicted_similarity",
+                "predicted_similarity_0_1",
+            )
+        )
         embeddings = model(data)
         for split_name in ("test",):
             rows = artifact["splits"][split_name]
             pairs, labels = _pairs_and_labels(rows)
+            pairs, labels = pairs.to(DEVICE), labels.to(DEVICE)
             predictions = model.score(embeddings, pairs).sigmoid()
             metrics = score_metrics(predictions, labels)
             _write_prediction_rows(writer, artifact["recipe_ids"], rows, predictions)
@@ -353,7 +412,7 @@ def evaluate(args: argparse.Namespace) -> None:
 
 
 def predict(args: argparse.Namespace) -> None:
-    from src.engine import RecipeEncoder
+    from src.engine import DEVICE, RecipeEncoder
 
     artifact = _load_artifact(args.data)
     ids = {
@@ -363,18 +422,18 @@ def predict(args: argparse.Namespace) -> None:
     missing = [recipe_id for recipe_id in (a_id, b_id) if recipe_id not in ids]
     if missing:
         raise ValueError(f"recipe ID absent from stage1.pt: {', '.join(missing)}")
-    features = artifact["recipe_features"]
+    features = artifact["recipe_features"].to(DEVICE)
     saved = torch.load(args.checkpoint, map_location="cpu", weights_only=True)
     if (
         saved["recipe_features"] != features.shape[1]
         or saved["data_seed"] != artifact["seed"]
     ):
         raise ValueError("checkpoint does not match the feature artifact")
-    model = RecipeEncoder(features.shape[1], saved["hidden"])
+    model = RecipeEncoder(features.shape[1], saved["hidden"]).to(DEVICE)
     model.load_state_dict(saved["model"])
     model.eval()
     data = _graph(features, artifact["splits"]["train"])
-    pair = torch.tensor([[ids[a_id]], [ids[b_id]]], dtype=torch.long)
+    pair = torch.tensor([[ids[a_id]], [ids[b_id]]], dtype=torch.long, device=DEVICE)
     with torch.no_grad():
         similarity = model.score(model(data), pair).sigmoid().item()
     print(
@@ -400,7 +459,7 @@ def rank_similar_recipes(
 
 
 def top_similar(args: argparse.Namespace) -> None:
-    from src.engine import RecipeEncoder
+    from src.engine import DEVICE, RecipeEncoder
 
     artifact = _load_artifact(args.data)
     recipe_ids = [str(recipe_id) for recipe_id in artifact["recipe_ids"]]
@@ -411,14 +470,14 @@ def top_similar(args: argparse.Namespace) -> None:
     if args.top_k < 1:
         raise ValueError("top_k must be positive")
 
-    features = artifact["recipe_features"]
+    features = artifact["recipe_features"].to(DEVICE)
     saved = torch.load(args.checkpoint, map_location="cpu", weights_only=True)
     if (
         saved["recipe_features"] != features.shape[1]
         or saved["data_seed"] != artifact["seed"]
     ):
         raise ValueError("checkpoint does not match the feature artifact")
-    model = RecipeEncoder(features.shape[1], saved["hidden"])
+    model = RecipeEncoder(features.shape[1], saved["hidden"]).to(DEVICE)
     model.load_state_dict(saved["model"])
     model.eval()
     data = _graph(features, artifact["splits"]["train"])
@@ -452,20 +511,20 @@ def main() -> None:
 
     prepare_parser = subcommands.add_parser("prepare")
     prepare_parser.add_argument(
-        "--recipes", type=Path, default=Path("data/recipes_masked.csv")
+        "--recipes", type=Path, default=Path("data/stage1/v3/recipes_masked_v3.csv")
     )
     prepare_parser.add_argument(
-        "--pairs", type=Path, default=Path("data/labeled_pairs_masked.csv")
+        "--pairs", type=Path, default=Path("data/stage1/v3/labeled_pairs_masked_v3.csv")
     )
     prepare_parser.add_argument(
-        "--output", type=Path, default=Path("data/stage1_embeddings.pt")
+        "--output", type=Path, default=Path("artifacts/stage1_embeddings_v3.pt")
     )
     prepare_parser.add_argument("--batch-size", type=int, default=32)
     prepare_parser.add_argument("--seed", type=int, default=42)
 
     train_parser = subcommands.add_parser("train")
     train_parser.add_argument(
-        "--data", type=Path, default=Path("data/stage1_embeddings.pt")
+        "--data", type=Path, default=Path("artifacts/stage1_embeddings_v3.pt")
     )
     train_parser.add_argument(
         "--output", type=Path, default=Path("checkpoints/stage1.pt")
@@ -479,7 +538,7 @@ def main() -> None:
 
     eval_parser = subcommands.add_parser("evaluate")
     eval_parser.add_argument(
-        "--data", type=Path, default=Path("data/stage1_embeddings.pt")
+        "--data", type=Path, default=Path("artifacts/stage1_embeddings_v3.pt")
     )
     eval_parser.add_argument(
         "--checkpoint", type=Path, default=Path("checkpoints/stage1.pt")
@@ -490,7 +549,7 @@ def main() -> None:
 
     predict_parser = subcommands.add_parser("predict")
     predict_parser.add_argument(
-        "--data", type=Path, default=Path("data/stage1_embeddings.pt")
+        "--data", type=Path, default=Path("artifacts/stage1_embeddings_v3.pt")
     )
     predict_parser.add_argument(
         "--checkpoint", type=Path, default=Path("checkpoints/stage1.pt")
@@ -500,13 +559,13 @@ def main() -> None:
 
     similar_parser = subcommands.add_parser("top-similar")
     similar_parser.add_argument(
-        "--data", type=Path, default=Path("data/stage1_embeddings.pt")
+        "--data", type=Path, default=Path("artifacts/stage1_embeddings_v3.pt")
     )
     similar_parser.add_argument(
         "--checkpoint", type=Path, default=Path("checkpoints/stage1.pt")
     )
     similar_parser.add_argument(
-        "--recipes", type=Path, default=Path("data/recipes_masked.csv")
+        "--recipes", type=Path, default=Path("data/stage1/v3/recipes_masked_v3.csv")
     )
     similar_parser.add_argument("--recipe-id", required=True)
     similar_parser.add_argument("--top-k", type=int, default=10)
