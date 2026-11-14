@@ -7,7 +7,7 @@ from pathlib import Path
 
 import torch
 
-from src.engine import IngredientLinkEncoder, RecipeEncoder
+from src.engine import DEVICE, IngredientLinkEncoder, RecipeEncoder
 from training.data import STAGE1_EMBEDDINGS, STAGE2_EMBEDDINGS, load_dataset
 
 
@@ -36,6 +36,7 @@ def main() -> None:
     parser.add_argument("--show", type=int, default=20, help="출력할 테스트 쌍 수")
     args = parser.parse_args()
     data, targets = load_dataset(args.stage1_data, args.data)
+    data = data.to(DEVICE)
     stage1 = torch.load(args.stage1_checkpoint, map_location="cpu", weights_only=True)
     stage2 = torch.load(args.stage2_checkpoint, map_location="cpu", weights_only=True)
     if (
@@ -45,8 +46,8 @@ def main() -> None:
         raise ValueError("checkpoint feature widths do not match the dataset")
     if stage1["hidden"] != stage2["hidden"]:
         raise ValueError("stage checkpoints use different hidden widths")
-    recipes = RecipeEncoder(stage1["recipe_features"], stage1["hidden"])
-    ingredients = IngredientLinkEncoder(stage2["ingredient_features"], stage2["hidden"])
+    recipes = RecipeEncoder(stage1["recipe_features"], stage1["hidden"]).to(DEVICE)
+    ingredients = IngredientLinkEncoder(stage2["ingredient_features"], stage2["hidden"]).to(DEVICE)
     recipes.load_state_dict(stage1["model"])
     ingredients.load_state_dict(stage2["model"])
     recipes.eval()
@@ -54,6 +55,7 @@ def main() -> None:
     with torch.no_grad():
         recipe_embeddings = recipes(data)
         pairs, labels = targets["test"]["ingredient"]
+        pairs, labels = pairs.to(DEVICE), labels.to(DEVICE)
         weights = ingredients.edge_weights(data, recipe_embeddings, pairs)
     print(
         f"stage2_contribution_test pairs={labels.numel()} "

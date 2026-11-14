@@ -106,6 +106,7 @@ class Stage1CsvTests(unittest.TestCase):
 
         fake_engine = types.ModuleType("src.engine")
         fake_engine.RecipeEncoder = RecipeEncoder
+        fake_engine.DEVICE = torch.device("cpu")
 
         with TemporaryDirectory() as directory:
             data_path = Path(directory) / "data.pt"

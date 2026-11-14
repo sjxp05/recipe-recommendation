@@ -16,6 +16,7 @@ from src.engine import (
     CATEGORY_CSV,
     CONTRIBUTION,
     CONTRIBUTION_CSV,
+    DEVICE,
     IngredientLinkEncoder,
     RecipeEncoder,
 )
@@ -57,12 +58,15 @@ def train(
         parameter.requires_grad_(False)
     with torch.no_grad():
         recipe_embeddings = recipe_model(data).detach()
+    # 레시피 임베딩과 같은 장치(GPU/CPU)에서 학습
+    device = recipe_embeddings.device
     model = IngredientLinkEncoder(
         data["Ingredient"].x.shape[1], recipe_embeddings.shape[1]
-    )
+    ).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
     pairs, labels = targets["train"]["ingredient"]
+    pairs, labels = pairs.to(device), labels.to(device)
     if labels.numel() == 0:
         raise ValueError("stage2 train split needs labeled contribution pairs")
 
@@ -75,6 +79,7 @@ def train(
         model.train()
         order = torch.randperm(labels.numel(), generator=generator)
         for selected in order.chunk(min(folds, labels.numel())):
+            selected = selected.to(device)
             fold_pairs, fold_labels = pairs[:, selected], labels[selected]
             context = _without_pairs(data, fold_pairs)
             optimizer.zero_grad()
@@ -122,13 +127,14 @@ def train_command(args: argparse.Namespace) -> None:
     if args.epochs < 1 or args.lr <= 0 or args.folds < 1:
         raise ValueError("epochs, lr and folds must be positive")
     data, targets = load_dataset(args.stage1_data, args.data)
+    data = data.to(DEVICE)
     stage1 = torch.load(args.stage1_data, map_location="cpu", weights_only=True)
     saved = torch.load(args.stage1_checkpoint, map_location="cpu", weights_only=True)
     if saved["recipe_features"] != data["Recipe"].x.shape[1]:
         raise ValueError("recipe feature width differs from the stage-1 checkpoint")
     if "data_seed" in saved and saved["data_seed"] != stage1["seed"]:
         raise ValueError("stage-1 checkpoint does not match the stage-1 embeddings")
-    recipe_model = RecipeEncoder(saved["recipe_features"], saved["hidden"])
+    recipe_model = RecipeEncoder(saved["recipe_features"], saved["hidden"]).to(DEVICE)
     recipe_model.load_state_dict(saved["model"])
     model, loss = train(
         data,
@@ -140,7 +146,8 @@ def train_command(args: argparse.Namespace) -> None:
         seed=args.seed,
     )
     checkpoint = {
-        "model": model.state_dict(),
+        # GPU가 없는 환경에서도 읽을 수 있도록 CPU 텐서로 저장
+        "model": {k: v.cpu() for k, v in model.state_dict().items()},
         "hidden": saved["hidden"],
         "ingredient_features": data["Ingredient"].x.shape[1],
     }

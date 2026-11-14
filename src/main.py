@@ -20,7 +20,7 @@ import torch
 from torch import Tensor
 from torch_geometric.data import HeteroData
 
-from src.engine import CONTRIBUTION_CSV, IngredientLinkEncoder, RecipeEncoder
+from src.engine import CONTRIBUTION_CSV, DEVICE, IngredientLinkEncoder, RecipeEncoder
 from training.data import (
     load_dataset,
     read_contributions,
@@ -28,7 +28,7 @@ from training.data import (
 )
 
 RECIPES_CSV = Path("data/stage1/v3/recipes_masked_v3.csv")
-STAGE1_EMBEDDINGS = Path("artifacts/stage1_embeddings.pt")
+STAGE1_EMBEDDINGS = Path("artifacts/stage1_embeddings_v3.pt")
 STAGE2_EMBEDDINGS = Path("artifacts/stage2_embeddings.pt")
 STAGE1_CHECKPOINT = Path("checkpoints/stage1.pt")
 STAGE2_CHECKPOINT = Path("checkpoints/stage2.pt")
@@ -92,6 +92,7 @@ def load_app(args: argparse.Namespace) -> App:
         [targets[split]["ingredient"][1] for split in ("train", "test")]
     )
     set_contributions(data, pairs, weights)
+    data = data.to(DEVICE)
 
     stage1 = torch.load(args.stage1_checkpoint, map_location="cpu", weights_only=True)
     stage2 = torch.load(args.stage2_checkpoint, map_location="cpu", weights_only=True)
@@ -102,8 +103,8 @@ def load_app(args: argparse.Namespace) -> App:
         raise SystemExit("체크포인트와 데이터의 특징 차원이 맞지 않습니다")
     if stage1["hidden"] != stage2["hidden"]:
         raise SystemExit("1단계와 2단계 체크포인트의 hidden 크기가 다릅니다")
-    recipe_model = RecipeEncoder(stage1["recipe_features"], stage1["hidden"])
-    model = IngredientLinkEncoder(stage2["ingredient_features"], stage2["hidden"])
+    recipe_model = RecipeEncoder(stage1["recipe_features"], stage1["hidden"]).to(DEVICE)
+    model = IngredientLinkEncoder(stage2["ingredient_features"], stage2["hidden"]).to(DEVICE)
     recipe_model.load_state_dict(stage1["model"])
     model.load_state_dict(stage2["model"])
     recipe_model.eval()

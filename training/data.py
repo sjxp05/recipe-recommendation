@@ -27,7 +27,7 @@ from src.engine import (
 )
 from training.stage1 import _context_edges
 
-STAGE1_EMBEDDINGS = Path("artifacts/stage1_embeddings.pt")
+STAGE1_EMBEDDINGS = Path("artifacts/stage1_embeddings_v3.pt")
 STAGE2_EMBEDDINGS = Path("artifacts/stage2_embeddings.pt")
 
 ContributionRow = tuple[str, str, float]  # (원본 레시피 ID, 재료 이름, 기여도)
