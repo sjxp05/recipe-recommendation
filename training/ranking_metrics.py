@@ -184,7 +184,7 @@ def main() -> None:
     parser.add_argument("--group-by", choices=("none", "recipe"), default="none")
     args = parser.parse_args()
 
-    with args.predictions.open(encoding="utf-8", newline="") as handle:
+    with args.predictions.open(encoding="utf-8-sig", newline="") as handle:
         rows = list(csv.DictReader(handle))
     scores = [float(row[args.score_column]) for row in rows]
     relevance = [float(row["similarity"]) for row in rows]

@@ -220,12 +220,12 @@ def _fold_context(
 
 
 def prepare(args: argparse.Namespace) -> None:
-    from src.engine import BGETextEncoder
+    from src.engine import GTETextEncoder
 
     recipes = unique_recipes(_read_csv(args.recipes))
     id_to_index = {row["id"]: index for index, row in enumerate(recipes)}
     splits = split_pairs(_read_csv(args.pairs), id_to_index, args.seed)
-    encoder = BGETextEncoder()
+    encoder = GTETextEncoder()
     texts = [recipe_text(row) for row in recipes]
     features = encoder.encode_texts(
         texts, batch_size=args.batch_size, show_progress_bar=True

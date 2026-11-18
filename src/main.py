@@ -12,6 +12,8 @@ from __future__ import annotations
 
 import argparse
 import csv
+import io
+import sys
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
@@ -272,6 +274,9 @@ def main() -> None:
     args = parser.parse_args()
     if args.top_k < 1:
         parser.error("--top-k는 1 이상이어야 합니다")
+    if not sys.stdin.isatty() and isinstance(sys.stdin, io.TextIOWrapper):
+        # PowerShell 파이프 등으로 들어온 입력 앞의 BOM 제거
+        sys.stdin.reconfigure(encoding="utf-8-sig")
 
     print("모델과 데이터를 불러오는 중...")
     app = load_app(args)

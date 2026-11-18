@@ -101,9 +101,9 @@ def train(
 
 
 def prepare(args: argparse.Namespace) -> None:
-    from src.engine import BGETextEncoder
+    from src.engine import GTETextEncoder
 
-    encoder = BGETextEncoder()
+    encoder = GTETextEncoder()
     artifact = prepare_stage2(
         lambda texts: encoder.encode_texts(
             texts, batch_size=args.batch_size, show_progress_bar=True

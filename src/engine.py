@@ -43,7 +43,7 @@ def _normalize_name(name: str) -> str:
 def _read_contribution_links(path: str) -> dict[str, frozenset[str]]:
     # 재료 이름 -> 해당 재료가 실제로 들어가는 원본 레시피 ID 집합
     links: dict[str, set[str]] = defaultdict(set)
-    with open(path, newline="", encoding="utf-8") as file:
+    with open(path, newline="", encoding="utf-8-sig") as file:
         for row in csv.DictReader(file):
             links[_normalize_name(row["ingredient"])].add(row["recipe_id"].strip())
     return {name: frozenset(ids) for name, ids in links.items()}
@@ -70,7 +70,7 @@ def recipes_with_ingredient(
 @lru_cache(maxsize=None)
 def _read_categories(path: str) -> dict[str, str]:
     # 재료 이름 -> 카테고리
-    with open(path, newline="", encoding="utf-8") as file:
+    with open(path, newline="", encoding="utf-8-sig") as file:
         return {
             _normalize_name(row["ingredient"]): row["category"].strip()
             for row in csv.DictReader(file)
@@ -101,9 +101,51 @@ def ingredients_in_same_category(
     )
 
 
-class BGETextEncoder:
-    # Recipe와 Ingredient 텍스트를 같은 BGE 임베딩 공간으로 변환하는 인코더
-    MODEL_NAME = "BAAI/bge-base-en-v1.5"
+def _token_windows(text: str, tokenizer, limit: int) -> list[tuple[str, int]]:
+    """토큰 한도를 넘는 텍스트를 잘라내지 않고 연속된 창으로 나눔: [(창 텍스트, 창의 토큰 수)]
+
+    모든 문자가 정확히 한 창에 들어가며, 각 창은 특수 토큰 포함 limit 토큰 이하
+    (1단계 학습 데이터를 만든 ordered_token_windows_v1 방식과 동일)
+    """
+    offsets = tokenizer(
+        text,
+        add_special_tokens=False,
+        truncation=False,
+        return_offsets_mapping=True,
+        verbose=False,
+    )["offset_mapping"]
+    if not offsets:
+        return [(text, 1)]
+    budget = limit - tokenizer.num_special_tokens_to_add(pair=False) - 8
+    if budget < 16:
+        raise ValueError("encoder token limit is too short for text windows")
+    windows = []
+    start = 0
+    while start < len(offsets):
+        end = min(start + budget, len(offsets))
+        while True:
+            begin_char = 0 if start == 0 else offsets[start][0]
+            end_char = len(text) if end == len(offsets) else offsets[end][0]
+            window = text[begin_char:end_char]
+            actual = len(
+                tokenizer(window, add_special_tokens=True, truncation=False, verbose=False)[
+                    "input_ids"
+                ]
+            )
+            if actual <= limit:
+                break
+            end -= 1
+            if end <= start:
+                raise ValueError("could not fit a token into the encoder window")
+        windows.append((window, end - start))
+        start = end
+    return windows
+
+
+class GTETextEncoder:
+    # Recipe와 Ingredient 텍스트를 GTE 임베딩 공간으로 변환하는 인코더
+    # 1단계 레시피 텍스트 형식: "Recipe: {이름}. Steps: {조리 단계를 공백으로 연결}" (training.stage1.recipe_text)
+    MODEL_NAME = "thenlper/gte-base"
 
     def __init__(self):
         self.model = SentenceTransformer(self.MODEL_NAME, device=DEVICE)
@@ -115,7 +157,11 @@ class BGETextEncoder:
         batch_size: int = 32,
         show_progress_bar: bool = False,
     ) -> Tensor:
-        # 텍스트 목록을 정규화된 float 텐서 [항목 수, 768]로 인코딩
+        """텍스트 목록을 정규화된 float 텐서 [항목 수, 768]로 인코딩
+
+        토큰 한도(512)를 넘는 텍스트는 여러 창으로 나눠 각각 인코딩한 뒤,
+        창의 토큰 수로 가중평균하고 다시 L2 정규화한다.
+        """
         if batch_size < 1:
             raise ValueError("batch_size는 1 이상이어야 합니다")
         if any(not isinstance(text, str) or not text.strip() for text in texts):
@@ -123,14 +169,24 @@ class BGETextEncoder:
         if not texts:
             return torch.empty((0, self.embedding_dim), dtype=torch.float32)
 
+        limit = self.model.max_seq_length
+        windows = [_token_windows(text, self.model.tokenizer, limit) for text in texts]
         vectors = self.model.encode(
-            texts,
+            [window for parts in windows for window, _ in parts],
             batch_size=batch_size,
             show_progress_bar=show_progress_bar,
             convert_to_tensor=True,
             normalize_embeddings=True,
-        )
-        return vectors.detach().to(device=DEVICE, dtype=torch.float32)
+        ).detach().to(device=DEVICE, dtype=torch.float32)
+
+        features = []
+        cursor = 0
+        for parts in windows:
+            weights = vectors.new_tensor([count for _, count in parts])
+            chunk = vectors[cursor : cursor + len(parts)]
+            features.append(F.normalize((chunk * weights[:, None]).sum(0), dim=0))
+            cursor += len(parts)
+        return torch.stack(features)
 
 
 def _check_pairs(pairs: Tensor, source_count: int, target_count: int) -> None:
