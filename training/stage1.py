@@ -15,6 +15,62 @@ from collections import Counter
 from pathlib import Path
 
 import torch
+from torch import nn
+from torch.nn import functional as F
+
+from src.engine import DEVICE, SIMILAR, WeightedSAGEConv, _check_pairs
+
+
+# 이전 1단계 모델 (실험 기록 재현용). 서비스 엔진은 src.engine.RecipePairGraphSAGE를 사용한다.
+class RecipeEncoder(nn.Module):
+    # SIMILAR로 연결된 레시피에 대해서만 인접 노드 aggregation
+    def __init__(self, recipe_features: int, hidden: int = 32):
+        super().__init__()
+        self.input = nn.Linear(recipe_features, hidden)
+        self.conv1 = WeightedSAGEConv(hidden)
+        self.conv2 = WeightedSAGEConv(hidden)
+        self.logit_scale = nn.Parameter(torch.tensor(2.0))
+
+    def forward(self, data) -> torch.Tensor:
+        x = data["Recipe"].x
+        edges = data[SIMILAR].edge_index
+        weights = data[SIMILAR].edge_weight
+        x = F.relu(self.input(x))
+        x = F.relu(self.conv1(x, x, edges, weights))
+        return F.normalize(self.conv2(x, x, edges, weights), dim=-1)
+
+    def score(self, recipe_embeddings: torch.Tensor, pairs: torch.Tensor) -> torch.Tensor:
+        _check_pairs(pairs, len(recipe_embeddings), len(recipe_embeddings))
+        left, right = pairs
+        return (recipe_embeddings[left] * recipe_embeddings[right]).sum(
+            -1
+        ) * self.logit_scale.exp().clamp(max=100)
+
+
+class OrderedRecipeEncoder(RecipeEncoder):
+    """Read frozen text windows in their original order before GraphSAGE."""
+
+    def __init__(self, recipe_features: int, hidden: int = 32):
+        super().__init__(recipe_features, hidden)
+        self.sequence = nn.GRU(hidden, hidden, batch_first=True)
+
+    def forward(self, data) -> torch.Tensor:
+        windows = data["Recipe"].window_features
+        counts = data["Recipe"].window_counts
+        if windows.ndim != 3 or counts.shape != (windows.shape[0],):
+            raise ValueError("invalid ordered recipe windows")
+        if (counts < 1).any() or (counts > windows.shape[1]).any():
+            raise ValueError("window counts are outside padded sequence")
+        projected = F.relu(self.input(windows))
+        packed = nn.utils.rnn.pack_padded_sequence(
+            projected, counts.cpu(), batch_first=True, enforce_sorted=False
+        )
+        _, state = self.sequence(packed)
+        x = F.relu(state[-1])
+        edges = data[SIMILAR].edge_index
+        weights = data[SIMILAR].edge_weight
+        x = F.relu(self.conv1(x, x, edges, weights))
+        return F.normalize(self.conv2(x, x, edges, weights), dim=-1)
 
 
 def _read_csv(path: Path) -> list[dict[str, str]]:
@@ -196,7 +252,6 @@ def _graph(features: torch.Tensor, context_rows: list[tuple[int, int, int]],
            window_features: torch.Tensor | None = None,
            window_counts: torch.Tensor | None = None):
     from torch_geometric.data import HeteroData
-    from src.engine import SIMILAR
 
     data = HeteroData()
     data["Recipe"].x = features
@@ -217,10 +272,7 @@ def _artifact_graph(artifact: dict, context_rows: list[tuple[int, int, int]]):
 
 
 def _artifact_model(artifact: dict, hidden: int):
-    if "window_features" in artifact:
-        from src.engine import OrderedRecipeEncoder as model_class
-    else:
-        from src.engine import RecipeEncoder as model_class
+    model_class = OrderedRecipeEncoder if "window_features" in artifact else RecipeEncoder
     return model_class(artifact["recipe_features"].shape[1], hidden)
 
 

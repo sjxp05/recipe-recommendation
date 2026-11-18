@@ -267,7 +267,8 @@ class Stage1CsvTests(unittest.TestCase):
             self.assertNotIn(tuple(sorted((a, b))), fold_edges)
 
     def test_recipe_encoder_uses_context_weights(self):
-        from src.engine import RecipeEncoder, SIMILAR
+        from src.engine import SIMILAR
+        from training.stage1 import RecipeEncoder
 
         torch.manual_seed(11)
         features = torch.randn(3, 4)
