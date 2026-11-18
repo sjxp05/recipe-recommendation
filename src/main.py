@@ -76,7 +76,7 @@ def _read_recipe_names(path: Path) -> dict[str, str]:
 def load_app(args: argparse.Namespace) -> App:
     required = {
         args.stage1_data: None,
-        args.stage1_checkpoint: "python -m training.stage1_rebuild --data <1단계 데이터> --out <폴더>",
+        args.stage1_checkpoint: "python -m training.stage1 train --data <1단계 데이터> --out <폴더>",
         args.data: "python -m training.stage2 prepare",
         args.stage2_checkpoint: "python -m training.stage2 train",
         args.recipes: None,

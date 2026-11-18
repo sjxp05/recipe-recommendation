@@ -1,6 +1,6 @@
 """레시피와 재료 사이의 연결을 평가하는 2단계 GraphSAGE 엔진
 
-1단계 (RecipePairGraphSAGE): training/stage1_rebuild.py로 학습한 레시피 인코더 + 쌍 유사도 MLP
+1단계 (RecipePairGraphSAGE): training/stage1.py로 학습한 레시피 인코더 + 쌍 유사도 MLP
 2단계 (IngredientLinkEncoder): 고정된 1단계 레시피 임베딩 위에서 레시피-재료 기여도 회귀
 
 Recipe-Recipe 간 연결: SIMILAR(0~1 유사도)
@@ -246,7 +246,7 @@ class WeightedSAGELayer(nn.Module):
 class RecipePairGraphSAGE(nn.Module):
     """1단계: SIMILAR 그래프 위 GraphSAGE 레시피 인코더 + 대칭 쌍 MLP 유사도 예측기
 
-    training/stage1_rebuild.py로 학습한 체크포인트를 그대로 읽는다 (계층 이름 변경 금지).
+    training/stage1.py(train)로 학습한 체크포인트를 그대로 읽는다 (계층 이름 변경 금지).
     score()는 sigmoid까지 적용한 0~1 유사도를 반환하며, floor(5 * 유사도)가 0~4점이다.
     """
 
@@ -345,7 +345,7 @@ def load_recipe_model(
     data: HeteroData,
     artifact_path: str | Path | None = None,
 ) -> RecipePairGraphSAGE:
-    """stage1_rebuild 체크포인트를 읽어 평가 모드의 1단계 모델을 반환 (data와 같은 장치)
+    """1단계 체크포인트(training/stage1.py train의 model.pt)를 읽어 평가 모드의 1단계 모델을 반환 (data와 같은 장치)
 
     artifact_path를 주면 체크포인트에 기록된 학습 데이터 해시와 일치하는지 확인한다.
     """
