@@ -1,0 +1,654 @@
+"""
+이전 1단계 학습 코드 보관용 (실험 스크립트·테스트 재현용)
+    - stage1_hidden_sweep, stage1_matrix, stage1_views와 tests/test_stage1.py가 사용
+    - 실제 1단계 파이프라인은 training/stage1.py (select → prepare → train)
+    - 실행 순서: prepare → train → evaluate
+"""
+
+from __future__ import annotations
+
+import argparse
+import ast
+import csv
+import json
+import math
+import random
+from collections import Counter
+from pathlib import Path
+
+import torch
+from torch import nn
+from torch.nn import functional as F
+
+from src.engine import DEVICE, SIMILAR, WeightedSAGEConv, _check_pairs
+
+
+# 이전 1단계 모델 (실험 기록 재현용). 서비스 엔진은 src.engine.RecipePairGraphSAGE를 사용한다.
+class RecipeEncoder(nn.Module):
+    # SIMILAR로 연결된 레시피에 대해서만 인접 노드 aggregation
+    def __init__(self, recipe_features: int, hidden: int = 32):
+        super().__init__()
+        self.input = nn.Linear(recipe_features, hidden)
+        self.conv1 = WeightedSAGEConv(hidden)
+        self.conv2 = WeightedSAGEConv(hidden)
+        self.logit_scale = nn.Parameter(torch.tensor(2.0))
+
+    def forward(self, data) -> torch.Tensor:
+        x = data["Recipe"].x
+        edges = data[SIMILAR].edge_index
+        weights = data[SIMILAR].edge_weight
+        x = F.relu(self.input(x))
+        x = F.relu(self.conv1(x, x, edges, weights))
+        return F.normalize(self.conv2(x, x, edges, weights), dim=-1)
+
+    def score(self, recipe_embeddings: torch.Tensor, pairs: torch.Tensor) -> torch.Tensor:
+        _check_pairs(pairs, len(recipe_embeddings), len(recipe_embeddings))
+        left, right = pairs
+        return (recipe_embeddings[left] * recipe_embeddings[right]).sum(
+            -1
+        ) * self.logit_scale.exp().clamp(max=100)
+
+
+class OrderedRecipeEncoder(RecipeEncoder):
+    """Read frozen text windows in their original order before GraphSAGE."""
+
+    def __init__(self, recipe_features: int, hidden: int = 32):
+        super().__init__(recipe_features, hidden)
+        self.sequence = nn.GRU(hidden, hidden, batch_first=True)
+
+    def forward(self, data) -> torch.Tensor:
+        windows = data["Recipe"].window_features
+        counts = data["Recipe"].window_counts
+        if windows.ndim != 3 or counts.shape != (windows.shape[0],):
+            raise ValueError("invalid ordered recipe windows")
+        if (counts < 1).any() or (counts > windows.shape[1]).any():
+            raise ValueError("window counts are outside padded sequence")
+        projected = F.relu(self.input(windows))
+        packed = nn.utils.rnn.pack_padded_sequence(
+            projected, counts.cpu(), batch_first=True, enforce_sorted=False
+        )
+        _, state = self.sequence(packed)
+        x = F.relu(state[-1])
+        edges = data[SIMILAR].edge_index
+        weights = data[SIMILAR].edge_weight
+        x = F.relu(self.conv1(x, x, edges, weights))
+        return F.normalize(self.conv2(x, x, edges, weights), dim=-1)
+
+
+def _read_csv(path: Path) -> list[dict[str, str]]:
+    with path.open(encoding="utf-8-sig", newline="") as handle:
+        return list(csv.DictReader(handle))
+
+
+def _operation_text(data: dict) -> str:
+    clauses = data.get("clauses") or []
+    if data.get("raw"):
+        text = data["raw"].strip()
+    else:
+        # 조건만 담은 OP의 verb는 if/until 등을 한 번 더 포함함
+        clause_markers = {clause.get("marker") for clause in clauses}
+        text = " ".join(
+            data[key].strip()
+            for key in ("subject", "verb", "object", "location", "other")
+            if data.get(key)
+            and not (key == "subject" and data[key].lower() == "you")
+            and not (key == "verb" and data[key] in clause_markers)
+        )
+    for key, prefix in (("time", "for"), ("temperature", "at")):
+        value = data.get(key)
+        if value and value.lower() not in text.lower():
+            detail = (
+                value if value.lower().startswith(prefix + " ") else f"{prefix} {value}"
+            )
+            text = " ".join(filter(None, (text, detail)))
+    for clause in clauses:
+        nested = " and ".join(
+            filter(None, (_operation_text(op) for op in clause.get("ops", [])))
+        )
+        body = " ".join(filter(None, (clause.get("text"), nested)))
+        if body:
+            condition = " ".join(filter(None, (clause.get("marker"), body)))
+            text = ", ".join(filter(None, (text, condition)))
+    return text
+
+
+def _step_text(step: dict) -> str:
+    parts = []
+    for operation in step.get("operations") or []:
+        text = _operation_text(operation["data"])
+        if text:
+            # 별도 OP로 분리된 부정어는 다음 동작과 붙여서 유지
+            if parts and parts[-1] == "not":
+                parts[-1] = f"not {text}"
+            else:
+                parts.append(text)
+    text = "; ".join(parts) or (step.get("text") or "").strip()
+    if not text:
+        raise ValueError("structured step has no operation or text")
+    return text if text.endswith((".", "!", "?")) else text + "."
+
+
+def _items(value: str) -> list[str]:
+    try:
+        parsed = json.loads(value)
+    except json.JSONDecodeError:
+        # 기존 CSV는 Python 문자열 목록, 구조화된 steps는 JSON으로 저장됨
+        parsed = ast.literal_eval(value)
+    if not isinstance(parsed, list) or not all(
+        isinstance(item, (str, dict)) for item in parsed
+    ):
+        raise ValueError("expected a list of strings or step objects in recipe CSV")
+    # 구조화된 steps는 JSON 문법 대신 조리 동작과 조건을 입력으로 사용.
+    return [item if isinstance(item, str) else _step_text(item) for item in parsed]
+
+
+def recipe_text(row: dict[str, str]) -> str:
+    steps = " ".join(_items(row["steps"]))
+    return f"Recipe: {row['name']}. Steps: {steps}"
+
+
+def unique_recipes(rows: list[dict[str, str]]) -> list[dict[str, str]]:
+    # 같은 ID의 중복 행: 마스킹된 조리 단계의 변형 가능성
+    # ID별 특징 벡터 하나를 위해 첫 번째 행 사용
+    by_id = {}
+    for row in rows:
+        by_id.setdefault(row["id"], row)
+    return list(by_id.values())
+
+
+def split_pairs(
+    rows: list[dict[str, str]], id_to_index: dict[str, int], seed: int
+) -> dict[str, list[tuple[int, int, int]]]:
+    # 0~4점 비율 유지, 학습/검증/테스트 70/15/15 분할
+    buckets: dict[int, list[tuple[int, int, int]]] = {score: [] for score in range(5)}
+    seen = set()
+    for row in rows:
+        left, right = row["a_id"], row["b_id"]
+        if left not in id_to_index or right not in id_to_index:
+            raise ValueError(f"pair references a missing recipe: {left}, {right}")
+        if left == right:
+            raise ValueError(f"self pair: {left}")
+        key = tuple(sorted((left, right)))
+        if key in seen:
+            raise ValueError(f"duplicate recipe pair: {left}, {right}")
+        seen.add(key)
+        score = int(row["similarity"])
+        if score not in buckets:
+            raise ValueError(f"similarity must be an integer from 0 to 4: {score}")
+        buckets[score].append((id_to_index[left], id_to_index[right], score))
+
+    rng = random.Random(seed)
+    result: dict[str, list[tuple[int, int, int]]] = {
+        name: [] for name in ("train", "val", "test")
+    }
+    for bucket in buckets.values():
+        rng.shuffle(bucket)
+        n_test = round(len(bucket) * 0.15)
+        n_val = round(len(bucket) * 0.15)
+        result["test"].extend(bucket[:n_test])
+        result["val"].extend(bucket[n_test : n_test + n_val])
+        result["train"].extend(bucket[n_test + n_val :])
+    for split in result.values():
+        rng.shuffle(split)
+    return result
+
+
+def _pairs_and_labels(
+    rows: list[tuple[int, int, int]],
+) -> tuple[torch.Tensor, torch.Tensor]:
+    pairs = (
+        torch.tensor([(a, b) for a, b, _ in rows], dtype=torch.long).t().contiguous()
+    )
+    labels = torch.tensor([score / 4 for _, _, score in rows], dtype=torch.float32)
+    return pairs, labels
+
+
+def _context_edges(
+    rows: list[tuple[int, int, int]],
+) -> tuple[torch.Tensor, torch.Tensor]:
+    positive = [(a, b, score / 4) for a, b, score in rows if score >= 1]
+    if not positive:
+        return torch.empty((2, 0), dtype=torch.long), torch.empty(0)
+    forward = torch.tensor([(a, b) for a, b, _ in positive], dtype=torch.long).t()
+    weights = torch.tensor([weight for _, _, weight in positive], dtype=torch.float32)
+    return torch.cat((forward, forward.flip(0)), dim=1), weights.repeat(2)
+
+
+def _fold_context(
+    rows: list[tuple[int, int, int]], selected: list[int]
+) -> list[tuple[int, int, int]]:
+    excluded = set(selected)
+    return [row for index, row in enumerate(rows) if index not in excluded]
+
+
+def prepare(args: argparse.Namespace) -> None:
+    from src.engine import GTETextEncoder
+
+    recipes = unique_recipes(_read_csv(args.recipes))
+    id_to_index = {row["id"]: index for index, row in enumerate(recipes)}
+    splits = split_pairs(_read_csv(args.pairs), id_to_index, args.seed)
+    encoder = GTETextEncoder()
+    texts = [recipe_text(row) for row in recipes]
+    features = encoder.encode_texts(
+        texts, batch_size=args.batch_size, show_progress_bar=True
+    ).cpu()
+    artifact = {
+        "recipe_ids": [row["id"] for row in recipes],
+        "recipe_features": features,
+        "splits": splits,
+        "seed": args.seed,
+        "encoder": encoder.MODEL_NAME,
+    }
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    torch.save(artifact, args.output)
+    print(
+        f"saved {len(recipes)} recipes and {sum(map(len, splits.values()))} pairs to {args.output}"
+    )
+    for name, split in splits.items():
+        print(
+            f"{name}: {len(split)} pairs; scores {dict(sorted(Counter(row[2] for row in split).items()))}"
+        )
+
+
+def _graph(features: torch.Tensor, context_rows: list[tuple[int, int, int]],
+           window_features: torch.Tensor | None = None,
+           window_counts: torch.Tensor | None = None):
+    from torch_geometric.data import HeteroData
+
+    data = HeteroData()
+    data["Recipe"].x = features
+    if window_features is not None:
+        if window_counts is None:
+            raise ValueError("ordered windows require counts")
+        data["Recipe"].window_features = window_features
+        data["Recipe"].window_counts = window_counts
+    data[SIMILAR].edge_index, data[SIMILAR].edge_weight = _context_edges(context_rows)
+    return data.to(features.device)  # 연결 텐서를 특징과 같은 장치(GPU/CPU)로
+
+
+def _artifact_graph(artifact: dict, context_rows: list[tuple[int, int, int]]):
+    if "window_features" in artifact:
+        return _graph(artifact["recipe_features"], context_rows,
+                      artifact["window_features"], artifact["window_counts"])
+    return _graph(artifact["recipe_features"], context_rows)
+
+
+def _artifact_model(artifact: dict, hidden: int):
+    model_class = OrderedRecipeEncoder if "window_features" in artifact else RecipeEncoder
+    return model_class(artifact["recipe_features"].shape[1], hidden)
+
+
+def _checkpoint_model(artifact: dict, saved: dict):
+    features = artifact["recipe_features"]
+    if (saved["recipe_features"] != features.shape[1]
+            or saved["data_seed"] != artifact["seed"]
+            or saved.get("ordered_windows", False) != ("window_features" in artifact)):
+        raise ValueError("checkpoint does not match the feature artifact")
+    model = _artifact_model(artifact, saved["hidden"])
+    model.load_state_dict(saved["model"])
+    model.eval()
+    return model
+
+
+def _load_artifact(path: Path) -> dict:
+    artifact = torch.load(path, map_location="cpu", weights_only=True)
+    if not isinstance(artifact["recipe_features"], torch.Tensor):
+        raise ValueError("invalid stage-1 feature artifact")
+    if "window_features" in artifact:
+        windows = artifact["window_features"]
+        counts = artifact.get("window_counts")
+        if (not isinstance(windows, torch.Tensor) or windows.ndim != 3
+                or windows.shape[0] != len(artifact["recipe_features"])
+                or windows.shape[2] != artifact["recipe_features"].shape[1]
+                or not isinstance(counts, torch.Tensor)
+                or counts.shape != (windows.shape[0],)
+                or (counts < 1).any() or (counts > windows.shape[1]).any()):
+            raise ValueError("invalid ordered windows in stage-1 artifact")
+    return artifact
+
+
+def train(args: argparse.Namespace) -> None:
+    artifact = _load_artifact(args.data)
+    features = artifact["recipe_features"].to(DEVICE)
+    train_rows = artifact["splits"]["train"]
+    val_rows = artifact["splits"]["val"]
+    if not train_rows:
+        raise ValueError("training split is empty")
+    if not val_rows:
+        raise ValueError(
+            "validation split is empty; early stopping requires validation pairs"
+        )
+    if args.folds < 2 or args.epochs < 1 or args.patience < 1:
+        raise ValueError("folds must be >= 2; epochs and patience must be >= 1")
+    rng = random.Random(args.seed)
+    model = _artifact_model(artifact, args.hidden)
+    optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
+    val_data = _artifact_graph(artifact, train_rows)
+    val_pairs, val_labels = _pairs_and_labels(val_rows)
+    val_pairs, val_labels = val_pairs.to(DEVICE), val_labels.to(DEVICE)
+    best_val_rmse = float("inf")
+    best_epoch = 0
+    stale_epochs = 0
+
+    # 폴드 교대 제외로 모든 학습 쌍을 예측 대상에 포함
+    # 현재 예측 폴드의 SIMILAR 연결은 입력 그래프에서 제외
+    for epoch in range(args.epochs):
+        order = list(range(len(train_rows)))
+        rng.shuffle(order)
+        fold_indices = [order[i :: args.folds] for i in range(args.folds)]
+        squared_error_sum = 0.0
+        prediction_count = 0
+        model.train()
+        for selected in fold_indices:
+            if not selected:
+                continue
+            context = _fold_context(train_rows, selected)
+            targets = [train_rows[i] for i in selected]
+            pairs, labels = _pairs_and_labels(targets)
+            data = _artifact_graph(artifact, context)
+            optimizer.zero_grad()
+            predictions = model.score(model(data), pairs).sigmoid()
+            # 학습 손실과 출력 오차를 모두 정규화된 0~1 척도 RMSE로 계산
+            squared_errors = (predictions - labels).square()
+            loss = (squared_errors.mean() + 1e-8).sqrt()
+            loss.backward()
+            optimizer.step()
+            squared_error_sum += float(squared_errors.detach().sum())
+            prediction_count += len(labels)
+        model.eval()
+        with torch.no_grad():
+            val_predictions = model.score(model(val_data), val_pairs).sigmoid()
+            val_rmse = float((val_predictions - val_labels).square().mean().sqrt())
+        if not math.isfinite(val_rmse):
+            raise ValueError("validation RMSE is not finite")
+        train_rmse = (squared_error_sum / prediction_count) ** 0.5
+        print(f"epoch={epoch + 1} train_rmse={train_rmse:.4f} val_rmse={val_rmse:.4f}")
+
+        if val_rmse < best_val_rmse:
+            best_val_rmse = val_rmse
+            best_epoch = epoch + 1
+            stale_epochs = 0
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            torch.save(
+                {
+                    # GPU가 없는 환경에서도 읽을 수 있도록 CPU 텐서로 저장
+                    "model": {k: v.cpu() for k, v in model.state_dict().items()},
+                    "hidden": args.hidden,
+                    "recipe_features": features.shape[1],
+                    "data_seed": artifact["seed"],
+                    "best_epoch": best_epoch,
+                    "best_val_rmse": best_val_rmse,
+                    "best_train_rmse": train_rmse,
+                    "ordered_windows": "window_features" in artifact,
+                },
+                args.output,
+            )
+        else:
+            stale_epochs += 1
+            if stale_epochs >= args.patience:
+                print(f"early_stopping epoch={epoch + 1} patience={args.patience}")
+                break
+    print(
+        f"best_epoch={best_epoch} best_val_rmse={best_val_rmse:.4f} checkpoint={args.output}"
+    )
+
+
+def score_metrics(predictions: torch.Tensor, labels: torch.Tensor) -> dict:
+    if predictions.ndim != 1 or labels.shape != predictions.shape or not labels.numel():
+        raise ValueError(
+            "predictions and labels must be non-empty 1D tensors of equal length"
+        )
+    if not torch.isfinite(predictions).all() or not torch.isfinite(labels).all():
+        raise ValueError("predictions and labels must be finite")
+
+    actual = (labels * 4).round().long().clamp(0, 4)
+    predicted = (predictions * 4).round().long().clamp(0, 4)
+    errors = predictions - labels
+    exact = (predicted == actual).float().mean().item()
+    within_one = ((predicted - actual).abs() <= 1).float().mean().item()
+    positive_actual = actual >= 2
+    positive_predicted = predicted >= 2
+    tp = int((positive_actual & positive_predicted).sum())
+    fp = int((~positive_actual & positive_predicted).sum())
+    fn = int((positive_actual & ~positive_predicted).sum())
+    tn = int((~positive_actual & ~positive_predicted).sum())
+    precision = tp / (tp + fp) if tp + fp else 0.0
+    recall = tp / (tp + fn) if tp + fn else 0.0
+    f1 = 2 * precision * recall / (precision + recall) if precision + recall else 0.0
+    specificity = tn / (tn + fp) if tn + fp else 0.0
+    confusion = [
+        [int(((actual == truth) & (predicted == guess)).sum()) for guess in range(5)]
+        for truth in range(5)
+    ]
+    return {
+        "mae": errors.abs().mean().item() * 4,
+        "rmse": errors.square().mean().sqrt().item(),
+        "exact_accuracy": exact,
+        "within_one_accuracy": within_one,
+        "zero_baseline_exact": (actual == 0).float().mean().item(),
+        "zero_baseline_within_one": (actual <= 1).float().mean().item(),
+        "positive_precision": precision,
+        "positive_recall": recall,
+        "positive_f1": f1,
+        "balanced_accuracy": (recall + specificity) / 2,
+        "confusion": confusion,
+    }
+
+
+def _write_prediction_rows(
+    writer: csv.writer,
+    recipe_ids: list[str],
+    rows: list[tuple[int, int, int]],
+    predictions: torch.Tensor,
+) -> None:
+    predicted_scores = (predictions * 4).round().long().clamp(0, 4).tolist()
+    for (a, b, score), predicted_score, similarity in zip(
+        rows, predicted_scores, predictions.tolist(), strict=True
+    ):
+        writer.writerow(
+            (recipe_ids[a], recipe_ids[b], score, predicted_score, similarity)
+        )
+
+
+def evaluate(args: argparse.Namespace) -> None:
+    artifact = _load_artifact(args.data)
+    saved = torch.load(args.checkpoint, map_location="cpu", weights_only=True)
+    model = _checkpoint_model(artifact, saved)
+    # 입력 그래프에서 검증·테스트 연결 제외
+    # 직접 연결되지 않은 쌍도 레시피별 텍스트 특징으로 점수 계산
+    data = _artifact_graph(artifact, artifact["splits"]["train"])
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    print("변환 기준: 예측 유사도 × 4를 반올림해 0~4점으로 변환, 2점 이상은 유사 쌍")
+    with torch.no_grad(), args.output.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.writer(handle)
+        writer.writerow(
+            (
+                "a_id",
+                "b_id",
+                "similarity",
+                "predicted_similarity",
+                "predicted_similarity_0_1",
+            )
+        )
+        embeddings = model(data)
+        for split_name in ("test",):
+            rows = artifact["splits"][split_name]
+            pairs, labels = _pairs_and_labels(rows)
+            pairs, labels = pairs.to(DEVICE), labels.to(DEVICE)
+            predictions = model.score(embeddings, pairs).sigmoid()
+            metrics = score_metrics(predictions, labels)
+            _write_prediction_rows(writer, artifact["recipe_ids"], rows, predictions)
+            print(f"{split_name}: n={len(rows)}")
+            print(
+                f"  점수 오차(0~4 라벨 기준): MAE={metrics['mae']:.4f} "
+                f"  RMSE={metrics['rmse']*4:.4f}"
+            )
+            print(f"  유사도 오차(0~1): RMSE={metrics['rmse']:.4f}")
+            print(f"  정답 비율={metrics['exact_accuracy']:.1%}")
+            print(f"  근접 비율(오차 1점 이내)={metrics['within_one_accuracy']:.1%}")
+            print(
+                f"  2점 이상(positive) 탐지: Precision={metrics['positive_precision']:.1%} "
+                f"Recall={metrics['positive_recall']:.1%} "
+                f"F1={metrics['positive_f1']:.3f} "
+                f"균형 정확도={metrics['balanced_accuracy']:.1%}"
+            )
+            print("  혼동 행렬(행=실제 점수, 열=예측 점수(0~4)):")
+            for score, counts in enumerate(metrics["confusion"]):
+                print(f"    {score}: {counts}")
+    print(f"predictions={args.output}")
+
+
+def predict(args: argparse.Namespace) -> None:
+    artifact = _load_artifact(args.data)
+    ids = {
+        str(recipe_id): index for index, recipe_id in enumerate(artifact["recipe_ids"])
+    }
+    a_id, b_id = str(args.a_id).strip(), str(args.b_id).strip()
+    missing = [recipe_id for recipe_id in (a_id, b_id) if recipe_id not in ids]
+    if missing:
+        raise ValueError(f"recipe ID absent from stage1.pt: {', '.join(missing)}")
+    saved = torch.load(args.checkpoint, map_location="cpu", weights_only=True)
+    model = _checkpoint_model(artifact, saved)
+    data = _artifact_graph(artifact, artifact["splits"]["train"])
+    pair = torch.tensor([[ids[a_id]], [ids[b_id]]], dtype=torch.long)
+    with torch.no_grad():
+        similarity = model.score(model(data), pair).sigmoid().item()
+    print(
+        f"{args.a_id},{args.b_id}: predicted_similarity={similarity:.4f} (scale 0..1)"
+    )
+
+
+def rank_similar_recipes(
+    model, embeddings: torch.Tensor, recipe_index: int, top_k: int
+) -> tuple[torch.Tensor, torch.Tensor]:
+    if not 0 <= recipe_index < len(embeddings):
+        raise ValueError("recipe index is outside the graph")
+    if top_k < 1:
+        raise ValueError("top_k must be positive")
+    candidates = torch.arange(len(embeddings), device=embeddings.device)
+    candidates = candidates[candidates != recipe_index]
+    if candidates.numel() == 0:
+        return candidates, embeddings.new_empty(0)
+    pairs = torch.stack((torch.full_like(candidates, recipe_index), candidates))
+    similarities = model.score(embeddings, pairs).sigmoid()
+    values, positions = similarities.topk(min(top_k, len(candidates)))
+    return candidates[positions], values
+
+
+def top_similar(args: argparse.Namespace) -> None:
+    artifact = _load_artifact(args.data)
+    recipe_ids = [str(recipe_id) for recipe_id in artifact["recipe_ids"]]
+    recipe_id = str(args.recipe_id).strip()
+    id_to_index = {value: index for index, value in enumerate(recipe_ids)}
+    if recipe_id not in id_to_index:
+        raise ValueError(f"recipe ID absent from stage1.pt: {recipe_id}")
+    if args.top_k < 1:
+        raise ValueError("top_k must be positive")
+
+    saved = torch.load(args.checkpoint, map_location="cpu", weights_only=True)
+    model = _checkpoint_model(artifact, saved)
+    data = _artifact_graph(artifact, artifact["splits"]["train"])
+    names = {row["id"]: row["name"] for row in unique_recipes(_read_csv(args.recipes))}
+    if recipe_id not in names:
+        raise ValueError(f"recipe ID absent from recipe CSV: {recipe_id}")
+
+    with torch.no_grad():
+        indices, similarities = rank_similar_recipes(
+            model, model(data), id_to_index[recipe_id], args.top_k
+        )
+    ranked_ids = [recipe_ids[index] for index in indices.tolist()]
+    missing_names = [
+        candidate_id for candidate_id in ranked_ids if candidate_id not in names
+    ]
+    if missing_names:
+        raise ValueError(
+            f"recipe IDs absent from recipe CSV: {', '.join(missing_names)}"
+        )
+    print(f"기준 레시피: {recipe_id} | {names[recipe_id]}")
+    print("순위\t레시피 ID\t레시피 이름\t예측 유사도(0~1)")
+    for rank, (candidate_id, similarity) in enumerate(
+        zip(ranked_ids, similarities.tolist(), strict=True), start=1
+    ):
+        print(f"{rank}\t{candidate_id}\t{names[candidate_id]}\t{similarity:.4f}")
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="CSV 기반 1단계 레시피 유사도 학습")
+    subcommands = parser.add_subparsers(dest="command", required=True)
+
+    prepare_parser = subcommands.add_parser("prepare")
+    prepare_parser.add_argument(
+        "--recipes", type=Path, default=Path("data/stage1/v3/recipes_masked_v3.csv")
+    )
+    prepare_parser.add_argument(
+        "--pairs", type=Path, default=Path("data/stage1/v3/labeled_pairs_masked_v3.csv")
+    )
+    prepare_parser.add_argument(
+        "--output", type=Path, default=Path("artifacts/stage1_embeddings_v3.pt")
+    )
+    prepare_parser.add_argument("--batch-size", type=int, default=32)
+    prepare_parser.add_argument("--seed", type=int, default=42)
+
+    train_parser = subcommands.add_parser("train")
+    train_parser.add_argument(
+        "--data", type=Path, default=Path("artifacts/stage1_embeddings_v3.pt")
+    )
+    train_parser.add_argument(
+        "--output", type=Path, default=Path("checkpoints/stage1.pt")
+    )
+    train_parser.add_argument("--hidden", type=int, default=32)
+    train_parser.add_argument("--epochs", type=int, default=100)
+    train_parser.add_argument("--folds", type=int, default=5)
+    train_parser.add_argument("--patience", type=int, default=10)
+    train_parser.add_argument("--lr", type=float, default=0.01)
+    train_parser.add_argument("--seed", type=int, default=42)
+
+    eval_parser = subcommands.add_parser("evaluate")
+    eval_parser.add_argument(
+        "--data", type=Path, default=Path("artifacts/stage1_embeddings_v3.pt")
+    )
+    eval_parser.add_argument(
+        "--checkpoint", type=Path, default=Path("checkpoints/stage1.pt")
+    )
+    eval_parser.add_argument(
+        "--output", type=Path, default=Path("data/stage1_predictions.csv")
+    )
+
+    predict_parser = subcommands.add_parser("predict")
+    predict_parser.add_argument(
+        "--data", type=Path, default=Path("artifacts/stage1_embeddings_v3.pt")
+    )
+    predict_parser.add_argument(
+        "--checkpoint", type=Path, default=Path("checkpoints/stage1.pt")
+    )
+    predict_parser.add_argument("--a-id", required=True)
+    predict_parser.add_argument("--b-id", required=True)
+
+    similar_parser = subcommands.add_parser("top-similar")
+    similar_parser.add_argument(
+        "--data", type=Path, default=Path("artifacts/stage1_embeddings_v3.pt")
+    )
+    similar_parser.add_argument(
+        "--checkpoint", type=Path, default=Path("checkpoints/stage1.pt")
+    )
+    similar_parser.add_argument(
+        "--recipes", type=Path, default=Path("data/stage1/v3/recipes_masked_v3.csv")
+    )
+    similar_parser.add_argument("--recipe-id", required=True)
+    similar_parser.add_argument("--top-k", type=int, default=10)
+
+    args = parser.parse_args()
+    if args.command == "prepare":
+        prepare(args)
+    elif args.command == "top-similar":
+        top_similar(args)
+    elif args.command == "train":
+        train(args)
+    elif args.command == "evaluate":
+        evaluate(args)
+    else:
+        predict(args)
+
+
+if __name__ == "__main__":
+    main()

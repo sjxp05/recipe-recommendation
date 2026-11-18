@@ -92,7 +92,7 @@ def train_toy_recipe_encoder(data):
 
 class EngineTests(unittest.TestCase):
     def test_ordered_recipe_encoder_distinguishes_reversed_windows(self):
-        from training.stage1 import _graph
+        from training.stage1_backup import _graph
 
         windows = torch.tensor([[[1.0, 0.0], [0.0, 1.0]],
                                 [[0.0, 1.0], [1.0, 0.0]]])

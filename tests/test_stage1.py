@@ -12,7 +12,7 @@ from unittest.mock import patch
 
 import torch
 
-from training.stage1 import (
+from training.stage1_backup import (
     _context_edges,
     _fold_context,
     _graph,
@@ -130,7 +130,7 @@ class Stage1CsvTests(unittest.TestCase):
             )
             output = StringIO()
             with patch.dict(sys.modules, {"src.engine": fake_engine}), patch(
-                "training.stage1._graph", side_effect=lambda data, rows: data
+                "training.stage1_backup._graph", side_effect=lambda data, rows: data
             ), redirect_stdout(output):
                 train(args)
 
@@ -268,7 +268,7 @@ class Stage1CsvTests(unittest.TestCase):
 
     def test_recipe_encoder_uses_context_weights(self):
         from src.engine import SIMILAR
-        from training.stage1 import RecipeEncoder
+        from training.stage1_backup import RecipeEncoder
 
         torch.manual_seed(11)
         features = torch.randn(3, 4)

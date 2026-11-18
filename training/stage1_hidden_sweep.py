@@ -16,7 +16,7 @@ from pathlib import Path
 
 from training.stage1_matrix import (DIMENSION, ENCODERS, read_manifest, sha256,
                                     test_metrics, write_results)
-from training.stage1 import (_load_artifact, evaluate as evaluate_stage1,
+from training.stage1_backup import (_load_artifact, evaluate as evaluate_stage1,
                              train as train_stage1)
 import torch
 

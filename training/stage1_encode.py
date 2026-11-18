@@ -21,7 +21,7 @@ from src.engine import CONTRIBUTION_CSV
 from training.data import STAGE1_EMBEDDINGS, read_contributions
 from training.stage1 import recipe_text
 
-SELECTED_RECIPES = Path("data/v3/recipes_raw_v3.csv")
+SELECTED_RECIPES = Path("data/recipes_raw_v3.csv")
 OUTPUT = Path("tmp/stage1_raw_gte.pt")
 COLUMNS = ("id", "name", "steps", "ingredients")
 
@@ -30,9 +30,12 @@ def select(args: argparse.Namespace) -> None:
     reference = torch.load(args.reference, map_location="cpu", weights_only=True)
     wanted = [str(value) for value in reference["recipe_ids"]]
     extra = sorted(
-        {recipe for recipe, _, _ in read_contributions(args.contributions)} - set(wanted)
+        {recipe for recipe, _, _ in read_contributions(args.contributions)}
+        - set(wanted)
     )
-    wanted += extra  # 기준 데이터 순서를 유지하고, 기여도 CSV에만 있는 레시피는 뒤에 추가
+    wanted += (
+        extra  # 기준 데이터 순서를 유지하고, 기여도 CSV에만 있는 레시피는 뒤에 추가
+    )
     remaining = set(wanted)
     rows: dict[str, dict[str, str]] = {}
     csv.field_size_limit(10**9)
@@ -67,7 +70,9 @@ def encode(args: argparse.Namespace) -> None:
         rows = {row["id"]: row for row in csv.DictReader(handle)}
     missing = [rid for rid in recipe_ids if rid not in rows]
     if missing:
-        raise ValueError(f"recipes absent from {args.recipes}: {', '.join(missing[:10])}")
+        raise ValueError(
+            f"recipes absent from {args.recipes}: {', '.join(missing[:10])}"
+        )
 
     encoder = GTETextEncoder()
     texts = [recipe_text(rows[rid]) for rid in recipe_ids]
