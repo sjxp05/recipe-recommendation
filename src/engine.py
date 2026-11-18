@@ -181,6 +181,32 @@ class RecipeEncoder(nn.Module):
         ) * self.logit_scale.exp().clamp(max=100)
 
 
+class OrderedRecipeEncoder(RecipeEncoder):
+    """Read frozen text windows in their original order before GraphSAGE."""
+
+    def __init__(self, recipe_features: int, hidden: int = 32):
+        super().__init__(recipe_features, hidden)
+        self.sequence = nn.GRU(hidden, hidden, batch_first=True)
+
+    def forward(self, data: HeteroData) -> Tensor:
+        windows = data["Recipe"].window_features
+        counts = data["Recipe"].window_counts
+        if windows.ndim != 3 or counts.shape != (windows.shape[0],):
+            raise ValueError("invalid ordered recipe windows")
+        if (counts < 1).any() or (counts > windows.shape[1]).any():
+            raise ValueError("window counts are outside padded sequence")
+        projected = F.relu(self.input(windows))
+        packed = nn.utils.rnn.pack_padded_sequence(
+            projected, counts.cpu(), batch_first=True, enforce_sorted=False
+        )
+        _, state = self.sequence(packed)
+        x = F.relu(state[-1])
+        edges = data[SIMILAR].edge_index
+        weights = data[SIMILAR].edge_weight
+        x = F.relu(self.conv1(x, x, edges, weights))
+        return F.normalize(self.conv2(x, x, edges, weights), dim=-1)
+
+
 class WeightedSAGEConv(nn.Module):
     # 이웃 메시지에 엣지 가중치를 곱한 뒤 이웃 수로 나누는 GraphSAGE 계층
     def __init__(self, hidden: int):

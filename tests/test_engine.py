@@ -11,6 +11,7 @@ from src.engine import (
     REV_CONTRIBUTION,
     SIMILAR,
     IngredientLinkEncoder,
+    OrderedRecipeEncoder,
     RecipeEncoder,
     WeightedSAGEConv,
     find_recipes_by_ingredient,
@@ -88,20 +89,17 @@ def train_toy_recipe_encoder(data):
 
 
 class EngineTests(unittest.TestCase):
-    def setUp(self):
-        directory = TemporaryDirectory()
-        self.addCleanup(directory.cleanup)
-        self.directory = Path(directory.name)
-        # 기존 대체 재료 테스트용: 토이 재료 6개를 모두 같은 카테고리로 둔다
-        self.same_category = self._write_category_csv(
-            [("vegetables", f"i{index}") for index in range(6)]
-        )
+    def test_ordered_recipe_encoder_distinguishes_reversed_windows(self):
+        from training.stage1 import _graph
 
-    def _write_category_csv(self, rows, name="category.csv"):
-        path = self.directory / name
-        lines = ["category,ingredient"] + [f"{c},{i}" for c, i in rows]
-        path.write_text("\n".join(lines) + "\n", encoding="utf-8")
-        return path
+        windows = torch.tensor([[[1.0, 0.0], [0.0, 1.0]],
+                                [[0.0, 1.0], [1.0, 0.0]]])
+        data = _graph(windows.mean(1), [], windows, torch.tensor([2, 2]))
+        torch.manual_seed(7)
+        model = OrderedRecipeEncoder(2, 8)
+        with torch.no_grad():
+            embeddings = model(data)
+        self.assertFalse(torch.allclose(embeddings[0], embeddings[1]))
 
     def test_two_stages_rank_unseen_links_and_freeze_recipe_encoder(self):
         torch.manual_seed(7)
