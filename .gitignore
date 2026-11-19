@@ -15,3 +15,6 @@ __pycache__/
 .env
 
 tmp/
+data/stage1/
+data/stage2/
+data/v3/

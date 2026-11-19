@@ -88,14 +88,14 @@ python -m unittest discover -s tests
 
 모든 입력은 원본 데이터 CSV 및 임베딩을 담은 pt 파일 사용
 
-| 단계  | 파일                                         | 내용                                                                                               |
-| ----- | -------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| 1단계 | `data/recipes_raw_v3.csv`                    | 1단계·기여도 CSV에 필요한 원문 레시피 (`id`, `name`, `steps`, `ingredients`), `stage1 select` 결과 |
-| 1단계 | `data/stage1/v3/labeled_pairs_masked_v3.csv` | 레시피 쌍 유사도 정답 (`a_id`, `b_id`, `similarity` 0~4점)                                         |
-| 1단계 | `data/stage1_rebuild_raw_gte.pt`             | 레시피 ID 순서(`recipe_ids`), GTE 임베딩(2914 × 768), train/val/test 쌍 분할(2235/478/478)         |
-| 2단계 | `data/stage2/ingredients_category.csv`       | 재료별 카테고리 (`category`, `ingredient`)                                                         |
-| 2단계 | `data/stage2/ingredients_contribution.csv`   | 레시피–재료 기여도 정답 (`ingredient`, `recipe_id`, `contribution` 0~1)                            |
-| 2단계 | `tmp/stage2_embeddings.pt`                   | `stage2 prepare` 결과: 재료 이름 순서, 재료 GTE 임베딩, 기여도 train/test 분할                     |
+| 단계  | 파일                                | 내용                                                                                               |
+| ----- | ----------------------------------- | -------------------------------------------------------------------------------------------------- |
+| 1단계 | `data/recipes_raw_v3.csv`           | 1단계·기여도 CSV에 필요한 원문 레시피 (`id`, `name`, `steps`, `ingredients`), `stage1 select` 결과 |
+| 1단계 | `data/labeled_pairs_masked_v3.csv`  | 레시피 쌍 유사도 정답 (`a_id`, `b_id`, `similarity` 0~4점)                                         |
+| 1단계 | `data/stage1_rebuild_raw_gte.pt`    | 레시피 ID 순서(`recipe_ids`), GTE 임베딩(2914 × 768), train/val/test 쌍 분할(2235/478/478)         |
+| 2단계 | `data/ingredients_category.csv`     | 재료별 카테고리 (`category`, `ingredient`)                                                         |
+| 2단계 | `data/ingredients_contribution.csv` | 레시피–재료 기여도 정답 (`ingredient`, `recipe_id`, `contribution` 0~1)                            |
+| 2단계 | `tmp/stage2_embeddings.pt`          | `stage2 prepare` 결과: 재료 이름 순서, 재료 GTE 임베딩, 기여도 train/test 분할                     |
 
 2단계 그래프(`training.data.load_dataset`) 구성
 
@@ -133,7 +133,7 @@ python -m unittest discover -s tests
 
 #### 기여도가 비슷한 대체 재료 찾기
 
-`recommend_substitutes()`: `data/stage2/ingredients_category.csv`에서 원래 재료와 같은 카테고리인 재료만 후보로 하고, 원래 재료의 기여도 `cont_a`와 후보의 예측 기여도 `cont_b` 사이의 `abs(cont_b - cont_a)`가 작은 순으로 `(ingredient_ids, weights)` 반환 (여기서 반환되는 `weights`는 `cont_b`와 같음)
+`recommend_substitutes()`: `data/ingredients_category.csv`에서 원래 재료와 같은 카테고리인 재료만 후보로 하고, 원래 재료의 기여도 `cont_a`와 후보의 예측 기여도 `cont_b` 사이의 `abs(cont_b - cont_a)`가 작은 순으로 `(ingredient_ids, weights)` 반환 (여기서 반환되는 `weights`는 `cont_b`와 같음)
 
 ```python
 ingredient_ids, weights = ingredient_model.recommend_substitutes(
@@ -153,7 +153,7 @@ ingredient_ids, weights = ingredient_model.recommend_substitutes(
 
 #### 같은 재료가 들어가는 유사 레시피 찾기
 
-`recommend_recipes()`: `data/stage2/ingredients_contribution.csv`에서 `ingredient_id`번 재료가 실제로 들어가는 레시피를 모두 찾고, 그중 `recipe_id`번 레시피와 유사도가 높은 순으로 최대 `top_k`개를 `(recipe_ids, similarities)`로 반환. 모델 예측 연결은 사용하지 않음
+`recommend_recipes()`: `data/ingredients_contribution.csv`에서 `ingredient_id`번 재료가 실제로 들어가는 레시피를 모두 찾고, 그중 `recipe_id`번 레시피와 유사도가 높은 순으로 최대 `top_k`개를 `(recipe_ids, similarities)`로 반환. 모델 예측 연결은 사용하지 않음
 
 - `recipe_model`(1단계 모델)을 넘기면 학습된 쌍 유사도(0~1, `RecipePairGraphSAGE.score`)로, 생략하면 1단계 임베딩의 코사인 유사도로 순위를 매김
 
@@ -171,7 +171,7 @@ recipe_ids, similarities = ingredient_model.recommend_recipes(
     recipe_id=0,      # 기준이 되는 원래 레시피의 노드 ID
     top_k=5,
     recipe_model=recipe_model,  # 1단계 쌍 유사도로 순위 (생략 시 코사인 유사도)
-    # contribution_path="data/stage2/ingredients_contribution.csv",
+    # contribution_path="data/ingredients_contribution.csv",
 )
 ```
 

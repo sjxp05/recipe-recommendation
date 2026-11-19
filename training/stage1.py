@@ -28,7 +28,8 @@ from torch.nn import functional as F
 
 from src.engine import CONTRIBUTION_CSV, RecipePairGraphSAGE, sha256
 
-SELECTED_RECIPES = Path("data/v3/recipes_raw_v3.csv")
+SELECTED_RECIPES = Path("data/recipes_raw_v3.csv")
+PAIRS_CSV = Path("data/labeled_pairs_masked_v3.csv")
 OUTPUT = Path("tmp/stage1_raw_gte.pt")
 COLUMNS = ("id", "name", "steps", "ingredients")
 THRESHOLDS = (0.2, 0.4, 0.6, 0.8)  # 0~1 유사도에서 0/1/2/3/4점을 나누는 경계
@@ -122,14 +123,19 @@ def _context_edges(
 
 
 def select(args: argparse.Namespace) -> None:
-    from training.data import read_contributions  # training.data가 이 모듈을 import하므로 지연 import
+    from training.data import (
+        read_contributions,
+    )  # training.data가 이 모듈을 import하므로 지연 import
 
     reference = torch.load(args.reference, map_location="cpu", weights_only=True)
     wanted = [str(value) for value in reference["recipe_ids"]]
     extra = sorted(
-        {recipe for recipe, _, _ in read_contributions(args.contributions)} - set(wanted)
+        {recipe for recipe, _, _ in read_contributions(args.contributions)}
+        - set(wanted)
     )
-    wanted += extra  # 기준 데이터 순서를 유지하고, 기여도 CSV에만 있는 레시피는 뒤에 추가
+    wanted += (
+        extra  # 기준 데이터 순서를 유지하고, 기여도 CSV에만 있는 레시피는 뒤에 추가
+    )
     remaining = set(wanted)
     rows: dict[str, dict[str, str]] = {}
     csv.field_size_limit(10**9)
@@ -154,17 +160,71 @@ def select(args: argparse.Namespace) -> None:
     )
 
 
+def split_pairs(
+    path: Path, id_to_index: dict[str, int], seed: int
+) -> dict[str, list[tuple[int, int, int]]]:
+    # 정답 쌍 CSV(a_id, b_id, similarity 0~4점)를 점수별 비율을 유지하며 train/val/test 70/15/15로 분할
+    buckets: dict[int, list[tuple[int, int, int]]] = {score: [] for score in range(5)}
+    seen = set()
+    with path.open(encoding="utf-8-sig", newline="") as handle:
+        for row in csv.DictReader(handle):
+            left, right = row["a_id"].strip(), row["b_id"].strip()
+            if left not in id_to_index or right not in id_to_index:
+                raise ValueError(f"pair references a missing recipe: {left}, {right}")
+            if left == right:
+                raise ValueError(f"self pair: {left}")
+            key = tuple(sorted((left, right)))
+            if key in seen:
+                raise ValueError(f"duplicate recipe pair: {left}, {right}")
+            seen.add(key)
+            score = int(row["similarity"])
+            if score not in buckets:
+                raise ValueError(f"similarity must be an integer from 0 to 4: {score}")
+            buckets[score].append((id_to_index[left], id_to_index[right], score))
+
+    rng = random.Random(seed)
+    splits: dict[str, list[tuple[int, int, int]]] = {"train": [], "val": [], "test": []}
+    for bucket in buckets.values():
+        rng.shuffle(bucket)
+        n_test = round(len(bucket) * 0.15)
+        n_val = round(len(bucket) * 0.15)
+        splits["test"].extend(bucket[:n_test])
+        splits["val"].extend(bucket[n_test : n_test + n_val])
+        splits["train"].extend(bucket[n_test + n_val :])
+    for split in splits.values():
+        rng.shuffle(split)
+    return splits
+
+
 def prepare(args: argparse.Namespace) -> None:
+    # 기준 pt(--reference)가 있으면 그 레시피 순서와 train/val/test 분할을 그대로 쓰고 특징만 GTE로 새로 인코딩
+    # 없으면 --recipes의 모든 레시피 순서 + --pairs 새 분할로 처음부터 만듦
     from src.engine import GTETextEncoder
 
-    reference = torch.load(args.reference, map_location="cpu", weights_only=True)
-    recipe_ids = [str(value) for value in reference["recipe_ids"]]
+    csv.field_size_limit(10**9)  # steps 컬럼이 기본 한도보다 길 수 있음
     with args.recipes.open(encoding="utf-8-sig", newline="") as handle:
-        csv.field_size_limit(10**9)
-        rows = {row["id"]: row for row in csv.DictReader(handle)}
-    missing = [rid for rid in recipe_ids if rid not in rows]
-    if missing:
-        raise ValueError(f"recipes absent from {args.recipes}: {', '.join(missing[:10])}")
+        rows: dict[str, dict[str, str]] = {}
+        for row in csv.DictReader(handle):
+            rows.setdefault(row["id"].strip(), row)  # 같은 ID가 여러 번이면 첫 행 사용
+
+    reference = None
+    if args.reference.exists():
+        reference = torch.load(args.reference, map_location="cpu", weights_only=True)
+        recipe_ids = [str(value) for value in reference["recipe_ids"]]
+        missing = [rid for rid in recipe_ids if rid not in rows]
+        if missing:
+            raise ValueError(
+                f"recipes absent from {args.recipes}: {', '.join(missing[:10])}"
+            )
+        splits, seed = reference["splits"], reference.get("seed", 42)
+        print(f"using reference {args.reference} (recipe order and splits kept)")
+    else:
+        recipe_ids = list(rows)
+        id_to_index = {rid: index for index, rid in enumerate(recipe_ids)}
+        splits, seed = split_pairs(args.pairs, id_to_index, args.seed), args.seed
+        print(
+            f"{args.reference} not found: splitting pairs from {args.pairs} (seed={seed})"
+        )
 
     encoder = GTETextEncoder()
     texts = [recipe_text(rows[rid]) for rid in recipe_ids]
@@ -174,8 +234,8 @@ def prepare(args: argparse.Namespace) -> None:
     artifact = {
         "recipe_ids": recipe_ids,
         "recipe_features": features,
-        "splits": reference["splits"],
-        "seed": reference.get("seed", 42),
+        "splits": splits,
+        "seed": seed,
         "encoder": encoder.MODEL_NAME,
         "view": "raw",
         "encoding_strategy": "ordered_token_windows_v1",
@@ -184,12 +244,11 @@ def prepare(args: argparse.Namespace) -> None:
     args.output.parent.mkdir(parents=True, exist_ok=True)
     torch.save(artifact, args.output)
 
-    # 기준 데이터와 같은 텍스트·인코더라면 벡터가 거의 같아야 함 (둘 다 L2 정규화)
-    cosine = (features * reference["recipe_features"]).sum(1)
-    print(
-        f"saved {len(recipe_ids)} recipes to {args.output}; "
-        f"cosine vs reference min={cosine.min():.6f} mean={cosine.mean():.6f}"
-    )
+    print(f"saved {len(recipe_ids)} recipes to {args.output}")
+    if reference is not None:
+        # 기준 데이터와 같은 텍스트·인코더라면 벡터가 거의 같아야 함 (둘 다 L2 정규화)
+        cosine = (features * reference["recipe_features"]).sum(1)
+        print(f"cosine vs reference min={cosine.min():.6f} mean={cosine.mean():.6f}")
 
 
 # ---------------- 학습 (train) ----------------
@@ -362,7 +421,9 @@ def train(args: argparse.Namespace) -> None:
                 model.encode(features, val_edges, val_weights), val_pairs, features
             )
             val_rmse = (val_predictions - val_labels).square().mean().sqrt().item()
-            val_ord = ordinal_loss(val_predictions, val_classes, args.temperature).item()
+            val_ord = ordinal_loss(
+                val_predictions, val_classes, args.temperature
+            ).item()
             val_objective = val_rmse + args.ordinal_weight * val_ord
             val_exact = (
                 ((val_predictions * 5).floor().long().clamp(0, 4) == val_classes)
@@ -501,7 +562,19 @@ def main() -> None:
 
     prepare_parser = subcommands.add_parser("prepare")
     prepare_parser.add_argument("--recipes", type=Path, default=SELECTED_RECIPES)
-    prepare_parser.add_argument("--reference", type=Path, default=STAGE1_EMBEDDINGS)
+    prepare_parser.add_argument(
+        "--reference",
+        type=Path,
+        default=STAGE1_EMBEDDINGS,
+        help="레시피 순서·분할 기준 pt (파일이 없으면 --pairs로 새로 분할)",
+    )
+    prepare_parser.add_argument(
+        "--pairs",
+        type=Path,
+        default=PAIRS_CSV,
+        help="기준 pt가 없을 때 분할할 정답 쌍 CSV (a_id, b_id, similarity 0~4점)",
+    )
+    prepare_parser.add_argument("--seed", type=int, default=42)
     prepare_parser.add_argument("--output", type=Path, default=OUTPUT)
     prepare_parser.add_argument("--batch-size", type=int, default=32)
 

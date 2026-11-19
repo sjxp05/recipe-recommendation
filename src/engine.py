@@ -30,9 +30,9 @@ REV_CONTRIBUTION = ("Ingredient", "REV_CONTRIBUTION", "Recipe")
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-STAGE2_DATA = Path(__file__).resolve().parents[1] / "data" / "stage2"
-CONTRIBUTION_CSV = STAGE2_DATA / "ingredients_contribution.csv"
-CATEGORY_CSV = STAGE2_DATA / "ingredients_category.csv"
+DATA_DIR = Path(__file__).resolve().parents[1] / "data"
+CONTRIBUTION_CSV = DATA_DIR / "ingredients_contribution.csv"
+CATEGORY_CSV = DATA_DIR / "ingredients_category.csv"
 
 
 def _normalize_name(name: str) -> str:
@@ -128,9 +128,9 @@ def _token_windows(text: str, tokenizer, limit: int) -> list[tuple[str, int]]:
             end_char = len(text) if end == len(offsets) else offsets[end][0]
             window = text[begin_char:end_char]
             actual = len(
-                tokenizer(window, add_special_tokens=True, truncation=False, verbose=False)[
-                    "input_ids"
-                ]
+                tokenizer(
+                    window, add_special_tokens=True, truncation=False, verbose=False
+                )["input_ids"]
             )
             if actual <= limit:
                 break
@@ -171,13 +171,17 @@ class GTETextEncoder:
 
         limit = self.model.max_seq_length
         windows = [_token_windows(text, self.model.tokenizer, limit) for text in texts]
-        vectors = self.model.encode(
-            [window for parts in windows for window, _ in parts],
-            batch_size=batch_size,
-            show_progress_bar=show_progress_bar,
-            convert_to_tensor=True,
-            normalize_embeddings=True,
-        ).detach().to(device=DEVICE, dtype=torch.float32)
+        vectors = (
+            self.model.encode(
+                [window for parts in windows for window, _ in parts],
+                batch_size=batch_size,
+                show_progress_bar=show_progress_bar,
+                convert_to_tensor=True,
+                normalize_embeddings=True,
+            )
+            .detach()
+            .to(device=DEVICE, dtype=torch.float32)
+        )
 
         features = []
         cursor = 0
@@ -540,7 +544,7 @@ class IngredientLinkEncoder(nn.Module):
     ) -> tuple[Tensor, Tensor]:
         """ingredient_id 재료가 실제로 들어가는 레시피 중 recipe_id와 유사한 순으로 반환
 
-        후보는 기여도 CSV(data/stage2/ingredients_contribution.csv)에 연결된 레시피로 한정하며 기준 레시피는 제외함
+        후보는 기여도 CSV(data/ingredients_contribution.csv)에 연결된 레시피로 한정하며 기준 레시피는 제외함
         recipe_model(1단계 모델)을 주면 학습된 쌍 유사도(0~1)로, 없으면 임베딩 코사인 유사도로 순위를 매김
         (recipe_embeddings는 recipe_model(data)의 정규화하지 않은 출력이어야 함)
 
