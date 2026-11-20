@@ -153,17 +153,23 @@ class Stage2DataTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "message-passing graph"):
             load_dataset(self.stage1, path)
 
-    def test_load_rejects_rows_missing_from_embeddings(self):
+    def test_load_skips_recipes_and_rejects_ingredients_missing_from_embeddings(self):
         _, artifact = self._save_stage2()
-        for row, message in (
-            (("999", "flour", 0.5), "stage-1 embeddings"),
-            (("100", "sugar", 0.5), "stage-2 embeddings"),
-        ):
-            with self.subTest(row=row):
-                splits = {"train": artifact["splits"]["train"] + [row], "test": []}
-                path, _ = self._save_stage2(splits=splits)
-                with self.assertRaisesRegex(ValueError, message):
-                    load_dataset(self.stage1, path)
+        base, _ = self._save_stage2(splits={"train": artifact["splits"]["train"], "test": []})
+        _, expected = load_dataset(self.stage1, base)
+
+        # 1단계 데이터에 없는 레시피의 기여도 행은 건너뛴다
+        splits = {"train": artifact["splits"]["train"] + [("999", "flour", 0.5)], "test": []}
+        path, _ = self._save_stage2(splits=splits)
+        _, targets = load_dataset(self.stage1, path)
+        for actual, wanted in zip(targets["train"]["ingredient"], expected["train"]["ingredient"]):
+            self.assertTrue(torch.equal(actual, wanted))
+
+        # 재료 임베딩에 없는 재료는 여전히 오류
+        splits = {"train": artifact["splits"]["train"] + [("100", "sugar", 0.5)], "test": []}
+        path, _ = self._save_stage2(splits=splits)
+        with self.assertRaisesRegex(ValueError, "stage-2 embeddings"):
+            load_dataset(self.stage1, path)
 
     def test_fold_context_drops_only_target_pairs_without_touching_graph(self):
         path, _ = self._save_stage2()

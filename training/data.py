@@ -1,6 +1,6 @@
 """2단계 데이터: 1단계 임베딩 pt + 2단계 CSV(카테고리·기여도)로 레시피–재료 그래프 구성
 
-- Recipe 노드: 1단계 임베딩 pt의 recipe_ids 순서, SIMILAR 연결은 1단계 학습 분할의 평가 쌍
+- Recipe 노드: 1단계 데이터 pt(stage1_rebuild 형식)의 recipe_ids 순서, SIMILAR 연결은 1단계 학습 분할의 평가 쌍
 - Ingredient 노드: 카테고리 CSV와 기여도 CSV에 등장하는 재료 이름(정규화 후 알파벳순)
 - CONTRIBUTION 연결: 기여도 CSV의 학습 분할만 메시지 전달 그래프에 포함
 """
@@ -27,8 +27,13 @@ from src.engine import (
 )
 from training.stage1 import _context_edges
 
-STAGE1_EMBEDDINGS = Path("artifacts/stage1_embeddings_v3.pt")
-STAGE2_EMBEDDINGS = Path("artifacts/stage2_embeddings.pt")
+# 1단계(stage1_rebuild) 입력 데이터와 학습된 체크포인트: 읽기 전용
+STAGE1_EMBEDDINGS = Path("data/stage1_rebuild_raw_gte.pt")
+STAGE1_CHECKPOINT = Path("checkpoints/stage1_rebuild_raw_gte_h64.pt")
+# 새 1단계 기준으로 다시 만드는 2단계 산출물: 기존 파일을 덮어쓰지 않도록 tmp/에 저장
+OUTPUT_DIR = Path("tmp")
+STAGE2_EMBEDDINGS = OUTPUT_DIR / "stage2_embeddings.pt"
+STAGE2_CHECKPOINT = OUTPUT_DIR / "stage2.pt"
 
 ContributionRow = tuple[str, str, float]  # (원본 레시피 ID, 재료 이름, 기여도)
 
@@ -239,11 +244,26 @@ def load_dataset(
     recipe_index = {value: index for index, value in enumerate(recipe_ids)}
     ingredient_index = {name: index for index, name in enumerate(names)}
 
+    # stage1_rebuild 데이터는 평가 쌍에 등장한 레시피만 담고 있어 기여도 CSV의 일부 레시피가 없을 수 있다.
+    # 1단계 그래프에 없는 레시피는 임베딩이 없으므로 그 기여도 행은 건너뛴다.
+    skipped = sorted(
+        {
+            recipe
+            for split in ("train", "test")
+            for recipe, _, _ in stage2["splits"][split]
+            if recipe not in recipe_index
+        }
+    )
+    if skipped:
+        print(
+            f"warning: skipping contributions of {len(skipped)} recipe(s) absent from "
+            f"stage-1 data: {', '.join(skipped[:10])}"
+        )
+
     targets = {}
     for split in ("train", "test"):
-        pairs, labels = _index_rows(
-            stage2["splits"][split], recipe_index, ingredient_index
-        )
+        rows = [row for row in stage2["splits"][split] if row[0] in recipe_index]
+        pairs, labels = _index_rows(rows, recipe_index, ingredient_index)
         targets[split] = {"ingredient": (pairs, labels)}
     train_keys = set(map(tuple, targets["train"]["ingredient"][0].t().tolist()))
     if any(

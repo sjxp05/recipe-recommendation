@@ -23,7 +23,7 @@ if sys.platform == "win32":
 import torch
 import torch.nn.functional as F
 
-from training.stage1 import (_artifact_graph, _checkpoint_model, _load_artifact, _pairs_and_labels,
+from training.stage1_backup import (_artifact_graph, _checkpoint_model, _load_artifact, _pairs_and_labels,
                              evaluate as evaluate_stage1, score_metrics,
                              train as train_stage1)
 from training.stage1_views import (VIEWS, load_assembly_helpers,

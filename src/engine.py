@@ -1,5 +1,8 @@
 """레시피와 재료 사이의 연결을 평가하는 2단계 GraphSAGE 엔진
 
+1단계 (RecipePairGraphSAGE): training/stage1.py로 학습한 레시피 인코더 + 쌍 유사도 MLP
+2단계 (IngredientLinkEncoder): 고정된 1단계 레시피 임베딩 위에서 레시피-재료 기여도 회귀
+
 Recipe-Recipe 간 연결: SIMILAR(0~1 유사도)
 Recipe-Ingredient 간 연결: CONTRIBUTION (0~1 기여도)
 학습 시 예측한 연결 점수는 그래프에 추가하지 않음
@@ -8,6 +11,7 @@ Recipe-Ingredient 간 연결: CONTRIBUTION (0~1 기여도)
 from __future__ import annotations
 
 import csv
+import hashlib
 import math
 from collections import defaultdict
 from collections.abc import Sequence
@@ -26,9 +30,9 @@ REV_CONTRIBUTION = ("Ingredient", "REV_CONTRIBUTION", "Recipe")
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-STAGE2_DATA = Path(__file__).resolve().parents[1] / "data" / "stage2"
-CONTRIBUTION_CSV = STAGE2_DATA / "ingredients_contribution.csv"
-CATEGORY_CSV = STAGE2_DATA / "ingredients_category.csv"
+DATA_DIR = Path(__file__).resolve().parents[1] / "data"
+CONTRIBUTION_CSV = DATA_DIR / "ingredients_contribution.csv"
+CATEGORY_CSV = DATA_DIR / "ingredients_category.csv"
 
 
 def _normalize_name(name: str) -> str:
@@ -39,7 +43,7 @@ def _normalize_name(name: str) -> str:
 def _read_contribution_links(path: str) -> dict[str, frozenset[str]]:
     # 재료 이름 -> 해당 재료가 실제로 들어가는 원본 레시피 ID 집합
     links: dict[str, set[str]] = defaultdict(set)
-    with open(path, newline="", encoding="utf-8") as file:
+    with open(path, newline="", encoding="utf-8-sig") as file:
         for row in csv.DictReader(file):
             links[_normalize_name(row["ingredient"])].add(row["recipe_id"].strip())
     return {name: frozenset(ids) for name, ids in links.items()}
@@ -66,7 +70,7 @@ def recipes_with_ingredient(
 @lru_cache(maxsize=None)
 def _read_categories(path: str) -> dict[str, str]:
     # 재료 이름 -> 카테고리
-    with open(path, newline="", encoding="utf-8") as file:
+    with open(path, newline="", encoding="utf-8-sig") as file:
         return {
             _normalize_name(row["ingredient"]): row["category"].strip()
             for row in csv.DictReader(file)
@@ -97,9 +101,51 @@ def ingredients_in_same_category(
     )
 
 
-class BGETextEncoder:
-    # Recipe와 Ingredient 텍스트를 같은 BGE 임베딩 공간으로 변환하는 인코더
-    MODEL_NAME = "BAAI/bge-base-en-v1.5"
+def _token_windows(text: str, tokenizer, limit: int) -> list[tuple[str, int]]:
+    """토큰 한도를 넘는 텍스트를 잘라내지 않고 연속된 창으로 나눔: [(창 텍스트, 창의 토큰 수)]
+
+    모든 문자가 정확히 한 창에 들어가며, 각 창은 특수 토큰 포함 limit 토큰 이하
+    (1단계 학습 데이터를 만든 ordered_token_windows_v1 방식과 동일)
+    """
+    offsets = tokenizer(
+        text,
+        add_special_tokens=False,
+        truncation=False,
+        return_offsets_mapping=True,
+        verbose=False,
+    )["offset_mapping"]
+    if not offsets:
+        return [(text, 1)]
+    budget = limit - tokenizer.num_special_tokens_to_add(pair=False) - 8
+    if budget < 16:
+        raise ValueError("encoder token limit is too short for text windows")
+    windows = []
+    start = 0
+    while start < len(offsets):
+        end = min(start + budget, len(offsets))
+        while True:
+            begin_char = 0 if start == 0 else offsets[start][0]
+            end_char = len(text) if end == len(offsets) else offsets[end][0]
+            window = text[begin_char:end_char]
+            actual = len(
+                tokenizer(
+                    window, add_special_tokens=True, truncation=False, verbose=False
+                )["input_ids"]
+            )
+            if actual <= limit:
+                break
+            end -= 1
+            if end <= start:
+                raise ValueError("could not fit a token into the encoder window")
+        windows.append((window, end - start))
+        start = end
+    return windows
+
+
+class GTETextEncoder:
+    # Recipe와 Ingredient 텍스트를 GTE 임베딩 공간으로 변환하는 인코더
+    # 1단계 레시피 텍스트 형식: "Recipe: {이름}. Steps: {조리 단계를 공백으로 연결}" (training.stage1.recipe_text)
+    MODEL_NAME = "thenlper/gte-base"
 
     def __init__(self):
         self.model = SentenceTransformer(self.MODEL_NAME, device=DEVICE)
@@ -111,7 +157,11 @@ class BGETextEncoder:
         batch_size: int = 32,
         show_progress_bar: bool = False,
     ) -> Tensor:
-        # 텍스트 목록을 정규화된 float 텐서 [항목 수, 768]로 인코딩
+        """텍스트 목록을 정규화된 float 텐서 [항목 수, 768]로 인코딩
+
+        토큰 한도(512)를 넘는 텍스트는 여러 창으로 나눠 각각 인코딩한 뒤,
+        창의 토큰 수로 가중평균하고 다시 L2 정규화한다.
+        """
         if batch_size < 1:
             raise ValueError("batch_size는 1 이상이어야 합니다")
         if any(not isinstance(text, str) or not text.strip() for text in texts):
@@ -119,14 +169,28 @@ class BGETextEncoder:
         if not texts:
             return torch.empty((0, self.embedding_dim), dtype=torch.float32)
 
-        vectors = self.model.encode(
-            texts,
-            batch_size=batch_size,
-            show_progress_bar=show_progress_bar,
-            convert_to_tensor=True,
-            normalize_embeddings=True,
+        limit = self.model.max_seq_length
+        windows = [_token_windows(text, self.model.tokenizer, limit) for text in texts]
+        vectors = (
+            self.model.encode(
+                [window for parts in windows for window, _ in parts],
+                batch_size=batch_size,
+                show_progress_bar=show_progress_bar,
+                convert_to_tensor=True,
+                normalize_embeddings=True,
+            )
+            .detach()
+            .to(device=DEVICE, dtype=torch.float32)
         )
-        return vectors.detach().to(device=DEVICE, dtype=torch.float32)
+
+        features = []
+        cursor = 0
+        for parts in windows:
+            weights = vectors.new_tensor([count for _, count in parts])
+            chunk = vectors[cursor : cursor + len(parts)]
+            features.append(F.normalize((chunk * weights[:, None]).sum(0), dim=0))
+            cursor += len(parts)
+        return torch.stack(features)
 
 
 def _check_pairs(pairs: Tensor, source_count: int, target_count: int) -> None:
@@ -156,55 +220,160 @@ def find_recipes_by_ingredient(
     return edge_index[1, mask].unique()
 
 
-class RecipeEncoder(nn.Module):
-    # 1단계: SIMILAR로 연결된 레시피에 대해서만 인접 노드 aggregation
-    def __init__(self, recipe_features: int, hidden: int = 32):
+def sha256(path: str | Path) -> str:
+    # 체크포인트가 어떤 1단계 데이터 파일로 학습됐는지 확인하는 해시
+    digest = hashlib.sha256()
+    with Path(path).open("rb") as handle:
+        for block in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+class WeightedSAGELayer(nn.Module):
+    # 1단계 GraphSAGE 계층: 이웃 벡터의 엣지 가중 평균(가중치 합으로 나눔)을 자기 벡터와 합침
+    def __init__(self, hidden: int):
         super().__init__()
-        self.input = nn.Linear(recipe_features, hidden)
-        self.conv1 = WeightedSAGEConv(hidden)
-        self.conv2 = WeightedSAGEConv(hidden)
-        self.logit_scale = nn.Parameter(torch.tensor(2.0))
+        self.self_linear = nn.Linear(hidden, hidden)
+        self.neighbor_linear = nn.Linear(hidden, hidden, bias=False)
 
-    def forward(self, data: HeteroData) -> Tensor:
-        x = data["Recipe"].x
-        edges = data[SIMILAR].edge_index
-        weights = data[SIMILAR].edge_weight
-        x = F.relu(self.input(x))
-        x = F.relu(self.conv1(x, x, edges, weights))
-        return F.normalize(self.conv2(x, x, edges, weights), dim=-1)
-
-    def score(self, recipe_embeddings: Tensor, pairs: Tensor) -> Tensor:
-        _check_pairs(pairs, len(recipe_embeddings), len(recipe_embeddings))
-        left, right = pairs
-        return (recipe_embeddings[left] * recipe_embeddings[right]).sum(
-            -1
-        ) * self.logit_scale.exp().clamp(max=100)
+    def forward(self, x: Tensor, edges: Tensor, weights: Tensor) -> Tensor:
+        neighbors = torch.zeros_like(x)
+        counts = x.new_zeros(len(x))
+        if weights.numel():
+            source, target = edges
+            neighbors.index_add_(0, target, x[source] * weights[:, None])
+            counts.index_add_(0, target, weights)
+        mean = neighbors / counts.clamp_min(1e-8)[:, None]
+        return self.self_linear(x) + self.neighbor_linear(mean)
 
 
-class OrderedRecipeEncoder(RecipeEncoder):
-    """Read frozen text windows in their original order before GraphSAGE."""
+class RecipePairGraphSAGE(nn.Module):
+    """1단계: SIMILAR 그래프 위 GraphSAGE 레시피 인코더 + 대칭 쌍 MLP 유사도 예측기
 
-    def __init__(self, recipe_features: int, hidden: int = 32):
-        super().__init__(recipe_features, hidden)
-        self.sequence = nn.GRU(hidden, hidden, batch_first=True)
+    training/stage1.py(train)로 학습한 체크포인트를 그대로 읽는다 (계층 이름 변경 금지).
+    score()는 sigmoid까지 적용한 0~1 유사도를 반환하며, floor(5 * 유사도)가 0~4점이다.
+    """
 
-    def forward(self, data: HeteroData) -> Tensor:
-        windows = data["Recipe"].window_features
-        counts = data["Recipe"].window_counts
-        if windows.ndim != 3 or counts.shape != (windows.shape[0],):
-            raise ValueError("invalid ordered recipe windows")
-        if (counts < 1).any() or (counts > windows.shape[1]).any():
-            raise ValueError("window counts are outside padded sequence")
-        projected = F.relu(self.input(windows))
-        packed = nn.utils.rnn.pack_padded_sequence(
-            projected, counts.cpu(), batch_first=True, enforce_sorted=False
+    def __init__(
+        self,
+        input_dim: int,
+        hidden: int,
+        dropout: float,
+        raw_cosine_stats: tuple[float, float] | None = None,
+        ordered_windows: bool = False,
+    ):
+        super().__init__()
+        self.dropout = dropout
+        self.use_raw_cosine = raw_cosine_stats is not None
+        self.ordered_windows = ordered_windows
+        if raw_cosine_stats is not None:
+            self.register_buffer("raw_cosine_mean", torch.tensor(raw_cosine_stats[0]))
+            self.register_buffer("raw_cosine_std", torch.tensor(raw_cosine_stats[1]))
+        self.input = nn.Sequential(
+            nn.Linear(input_dim, hidden), nn.LayerNorm(hidden), nn.GELU()
         )
-        _, state = self.sequence(packed)
-        x = F.relu(state[-1])
-        edges = data[SIMILAR].edge_index
-        weights = data[SIMILAR].edge_weight
-        x = F.relu(self.conv1(x, x, edges, weights))
-        return F.normalize(self.conv2(x, x, edges, weights), dim=-1)
+        if ordered_windows:
+            self.window_gru = nn.GRU(hidden, hidden, batch_first=True)
+        self.sage1 = WeightedSAGELayer(hidden)
+        self.norm1 = nn.LayerNorm(hidden)
+        self.sage2 = WeightedSAGELayer(hidden)
+        self.norm2 = nn.LayerNorm(hidden)
+        self.pair_head = nn.Sequential(
+            nn.Linear(hidden * 3 + int(self.use_raw_cosine), hidden),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(hidden, 1),
+        )
+
+    def encode(
+        self,
+        features: Tensor,
+        edges: Tensor,
+        weights: Tensor,
+        windows: Tensor | None = None,
+        counts: Tensor | None = None,
+    ) -> Tensor:
+        if self.ordered_windows:
+            if windows is None or counts is None:
+                raise ValueError("ordered model requires window features and counts")
+            projected = self.input(windows)
+            packed = nn.utils.rnn.pack_padded_sequence(
+                projected, counts.cpu(), batch_first=True, enforce_sorted=False
+            )
+            _, state = self.window_gru(packed)
+            x = state[-1]
+        else:
+            x = self.input(features)
+        x = F.dropout(x, p=self.dropout, training=self.training)
+        x = F.gelu(self.norm1(self.sage1(x, edges, weights)))
+        x = F.dropout(x, p=self.dropout, training=self.training)
+        x = F.gelu(self.norm2(self.sage2(x, edges, weights) + x))
+        return x
+
+    def forward(self, data: HeteroData) -> Tensor:
+        # 그래프 입력용 래퍼: 레시피 임베딩 [레시피 수, hidden] (L2 정규화하지 않음)
+        store = data["Recipe"]
+        return self.encode(
+            store.x,
+            data[SIMILAR].edge_index,
+            data[SIMILAR].edge_weight,
+            getattr(store, "window_features", None),
+            getattr(store, "window_counts", None),
+        )
+
+    def score(
+        self,
+        embeddings: Tensor,
+        pairs: Tensor,
+        raw_features: Tensor | None = None,
+    ) -> Tensor:
+        # 레시피 쌍의 0~1 유사도 (raw_features: 원본 레시피 특징, 보통 data["Recipe"].x)
+        _check_pairs(pairs, len(embeddings), len(embeddings))
+        left, right = embeddings[pairs[0]], embeddings[pairs[1]]
+        symmetric = torch.cat(
+            (torch.abs(left - right), left * right, (left + right) / 2), dim=-1
+        )
+        if self.use_raw_cosine:
+            if raw_features is None:
+                raise ValueError("raw recipe features are required by this checkpoint")
+            raw_cosine = F.cosine_similarity(
+                raw_features[pairs[0]], raw_features[pairs[1]]
+            )
+            standardized = (raw_cosine - self.raw_cosine_mean) / self.raw_cosine_std
+            symmetric = torch.cat((symmetric, standardized[:, None]), dim=-1)
+        return torch.sigmoid(self.pair_head(symmetric).squeeze(-1))
+
+
+def load_recipe_model(
+    checkpoint_path: str | Path,
+    data: HeteroData,
+    artifact_path: str | Path | None = None,
+) -> RecipePairGraphSAGE:
+    """1단계 체크포인트(training/stage1.py train의 model.pt)를 읽어 평가 모드의 1단계 모델을 반환 (data와 같은 장치)
+
+    artifact_path를 주면 체크포인트에 기록된 학습 데이터 해시와 일치하는지 확인한다.
+    """
+    saved = torch.load(checkpoint_path, map_location="cpu", weights_only=True)
+    if artifact_path is not None and "artifact_sha256" in saved:
+        if saved["artifact_sha256"] != sha256(artifact_path):
+            raise ValueError(
+                "stage-1 checkpoint was trained with a different data file"
+            )
+    if saved.get("no_graph", False):
+        # 그래프 없이 학습한 비교 실험용 체크포인트는 SIMILAR 그래프와 함께 쓸 수 없음
+        raise ValueError(
+            "no-graph ablation checkpoints are not supported by the engine"
+        )
+    stats = saved.get("raw_cosine_stats") if saved.get("raw_cosine_feature") else None
+    model = RecipePairGraphSAGE(
+        data["Recipe"].x.shape[1],
+        saved["hidden"],
+        saved["dropout"],
+        stats,
+        saved.get("ordered_windows", False),
+    )
+    model.load_state_dict(saved["model"])
+    return model.to(data["Recipe"].x.device).eval()
 
 
 class WeightedSAGEConv(nn.Module):
@@ -371,16 +540,18 @@ class IngredientLinkEncoder(nn.Module):
         top_k: int = 10,
         *,
         contribution_path: str | Path = CONTRIBUTION_CSV,
+        recipe_model: RecipePairGraphSAGE | None = None,
     ) -> tuple[Tensor, Tensor]:
         """ingredient_id 재료가 실제로 들어가는 레시피 중 recipe_id와 유사한 순으로 반환
 
-        후보는 기여도 CSV(data/stage2/ingredients_contribution.csv)에 연결된 레시피로 한정
-        1단계 레시피 임베딩에서 학습한 코사인 유사도를 사용하며 기준 레시피는 제외함
+        후보는 기여도 CSV(data/ingredients_contribution.csv)에 연결된 레시피로 한정하며 기준 레시피는 제외함
+        recipe_model(1단계 모델)을 주면 학습된 쌍 유사도(0~1)로, 없으면 임베딩 코사인 유사도로 순위를 매김
+        (recipe_embeddings는 recipe_model(data)의 정규화하지 않은 출력이어야 함)
 
         그래프에 노드 번호와 CSV 표기의 대응이 저장되어 있어야 함
             data["Recipe"].raw_id[i]: i번 Recipe 노드의 원본 레시피 ID (CSV의 recipe_id)
             data["Ingredient"].ingredient_name[j]: j번 Ingredient 노드의 재료 이름 (CSV의 ingredient)
-        반환값: (후보 레시피 노드 인덱스, 코사인 유사도)
+        반환값: (후보 레시피 노드 인덱스, 유사도)
         """
         recipe_ids = getattr(data["Recipe"], "raw_id", None)
         ingredient_names = getattr(data["Ingredient"], "ingredient_name", None)
@@ -411,7 +582,13 @@ class IngredientLinkEncoder(nn.Module):
         if candidates.numel() == 0:
             return candidates, recipe_embeddings.new_empty(0)
 
-        embeddings = F.normalize(recipe_embeddings, dim=-1)
-        similarities = embeddings[candidates] @ embeddings[recipe_id]
+        if recipe_model is not None:
+            pairs = torch.stack((torch.full_like(candidates, recipe_id), candidates))
+            similarities = recipe_model.score(
+                recipe_embeddings, pairs, data["Recipe"].x.to(device)
+            )
+        else:
+            embeddings = F.normalize(recipe_embeddings, dim=-1)
+            similarities = embeddings[candidates] @ embeddings[recipe_id]
         positions = similarities.argsort(descending=True, stable=True)[:top_k]
         return candidates[positions], similarities[positions]

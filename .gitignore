@@ -13,3 +13,8 @@ __pycache__/
 *.pyc
 
 .env
+
+tmp/
+data/stage1/
+data/stage2/
+data/v3/
