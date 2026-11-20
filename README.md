@@ -210,10 +210,20 @@ python -m training.stage1 train --data tmp/stage1_raw_gte.pt --out tmp/stage1
 
 - `train`: `RecipePairGraphSAGE`를 학습해 `--out` 폴더(비어 있거나 없는 폴더)에 저장
     - `model.pt`: 검증 목표값이 가장 낮은 epoch의 체크포인트 (`load_recipe_model()` 형식)
-    - `metrics.json`: 설정과 val/test 지표 (RMSE, MAE, 정답 비율, 1점 이내 비율, 2점 이상 positive의 Precision/Recall/F1, 혼동 행렬 등)
+    - `metrics.json`: 설정과 val/test 지표 (RMSE, MAE, 정답 비율, 1점 이내 비율, 3점 이상 positive의 Precision/Recall/F1, 혼동 행렬 등). 순위 지표는 각 분할의 `ranking` 항목에 저장하고 test 값은 학습 후 출력
     - `history.json`: epoch별 학습/검증 지표
     - `test_predictions.csv`: `a_id,b_id,actual_score,predicted_similarity,predicted_score`
     - 옵션: `--data`, `--out`(required), `--hidden`(64), `--dropout`(0.15), `--epochs`(100), `--folds`(5), `--patience`(10), `--lr`(0.003), `--weight-decay`(0.001), `--ordinal-weight`(0.2), `--temperature`(0.1), `--no-raw-cosine-feature`, `--seed`(42)
+
+순위 평가 (`training/ranking_metrics.py`)
+
+- 분할의 모든 쌍을 예측 유사도 순으로 줄 세워 하나의 순위로 평가, 정답 **3점 이상**인 쌍을 적절한 쌍으로 봄 (2점 이상은 test 쌍의 75%라 무작위 순서로도 Precision이 높게 나옴)
+- 지표: Spearman's rho, K=10/50/100의 NDCG·Precision·Recall
+    - Recall@K는 K/R을 넘을 수 없음 (test 적절한 쌍 236개 기준 K=10이면 최대 0.042)
+    - 예측 점수가 같은 쌍은 동점 내 모든 순서의 기댓값으로 계산
+- 예측 CSV로 따로 계산할 때는 `python training/ranking_metrics.py <예측 CSV>`
+    - CSV에 `similarity`(실제 0~4점)와 `predicted_similarity` 열이 필요 (`train`이 저장하는 `test_predictions.csv`는 실제 점수 열 이름이 `actual_score`)
+    - 옵션: `--k`(10 50 100), `--threshold`(3.0), `--score-column`(`predicted_similarity`), `--group-by`(`none`: 전체 쌍 하나의 순위, `recipe`: 기준 레시피별 순위의 평균)
 
 학습 방식
 

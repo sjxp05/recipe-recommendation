@@ -1,5 +1,6 @@
 # 레시피 유사도 예측의 순위 평가: NDCG@K, Precision@K, Recall@K, Spearman's rho
 # 동점 레시피는 순서를 정할 수 없으므로 동점 내 모든 순서의 기댓값으로 계산 (파일 순서에 영향받지 않음)
+# 정답 점수 3점 이상(0~4점)을 적절한 레시피로 봄
 
 from __future__ import annotations
 
@@ -11,7 +12,7 @@ from itertools import groupby
 from pathlib import Path
 
 DEFAULT_KS = (10, 50, 100)
-DEFAULT_THRESHOLD = 2.0
+DEFAULT_THRESHOLD = 3.0
 
 
 def _validate(scores: list[float], relevance: list[float], k: int = 1) -> None:
@@ -55,7 +56,9 @@ def ndcg_at_k(scores: list[float], relevance: list[float], k: int) -> float:
     for group in _tie_groups(scores):
         end = position + len(group)
         gain = sum(relevance[index] for index in group) / len(group)
-        dcg += gain * sum(1 / math.log2(rank + 2) for rank in range(position, min(end, k)))
+        dcg += gain * sum(
+            1 / math.log2(rank + 2) for rank in range(position, min(end, k))
+        )
         position = end
     return dcg / ideal
 
@@ -165,7 +168,9 @@ def _candidates_by_recipe(
     return [group for group in grouped.values() if len(group[0]) >= 2]
 
 
-def _print_metrics(metrics: dict[str, float], ks: tuple[int, ...], indent: str = "") -> None:
+def _print_metrics(
+    metrics: dict[str, float], ks: tuple[int, ...], indent: str = ""
+) -> None:
     print(f"{indent}Spearman's rho={metrics['spearman']:.3f}")
     for k in ks:
         print(

@@ -316,7 +316,7 @@ def measure(predictions: torch.Tensor, classes: torch.Tensor) -> dict:
         [int(((classes == actual) & (predicted == guess)).sum()) for guess in range(5)]
         for actual in range(5)
     ]
-    positive_actual, positive_predicted = classes >= 2, predicted >= 2
+    positive_actual, positive_predicted = classes >= 3, predicted >= 3
     tp = int((positive_actual & positive_predicted).sum())
     fp = int((~positive_actual & positive_predicted).sum())
     fn = int((positive_actual & ~positive_predicted).sum())
