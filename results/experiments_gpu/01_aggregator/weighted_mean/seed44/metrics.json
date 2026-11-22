@@ -1,0 +1,165 @@
+{
+  "settings": {
+    "aggregator": "weighted_mean",
+    "gru_order": "fixed",
+    "num_layers": 2,
+    "lr": 0.003,
+    "hidden": 64,
+    "dropout": 0.15,
+    "weight_decay": 0.001,
+    "ordinal_weight": 0.2,
+    "temperature": 0.1,
+    "folds": 5,
+    "epochs": 100,
+    "patience": 10,
+    "raw_cosine_feature": true,
+    "seed": 44,
+    "device": "cuda"
+  },
+  "best_epoch": 56,
+  "stopped_epoch": 66,
+  "hit_epoch_cap": false,
+  "parameters": 78593,
+  "val": {
+    "n": 478,
+    "rmse_0_1": 0.18181121349334717,
+    "mae_0_4": 0.5468239784240723,
+    "exact_accuracy": 0.5397489666938782,
+    "within_one_accuracy": 0.9372384548187256,
+    "positive_precision": 0.708904109589041,
+    "positive_recall": 0.8771186440677966,
+    "positive_f1": 0.7840909090909091,
+    "balanced_accuracy": 0.7629394873231545,
+    "confusion_matrix": [
+      [
+        54,
+        9,
+        6,
+        1,
+        0
+      ],
+      [
+        12,
+        20,
+        13,
+        6,
+        0
+      ],
+      [
+        5,
+        8,
+        30,
+        73,
+        5
+      ],
+      [
+        0,
+        4,
+        22,
+        126,
+        22
+      ],
+      [
+        0,
+        0,
+        3,
+        31,
+        28
+      ]
+    ],
+    "predicted_counts": [
+      71,
+      41,
+      74,
+      237,
+      55
+    ],
+    "actual_counts": [
+      70,
+      51,
+      121,
+      174,
+      62
+    ],
+    "per_class_recall": [
+      0.7714285714285715,
+      0.39215686274509803,
+      0.24793388429752067,
+      0.7241379310344828,
+      0.45161290322580644
+    ],
+    "min_prediction": 8.007563155842945e-05,
+    "max_prediction": 0.9948470592498779
+  },
+  "test": {
+    "n": 478,
+    "rmse_0_1": 0.19009776413440704,
+    "mae_0_4": 0.5861078500747681,
+    "exact_accuracy": 0.5188284516334534,
+    "within_one_accuracy": 0.930962324142456,
+    "positive_precision": 0.7304964539007093,
+    "positive_recall": 0.8728813559322034,
+    "positive_f1": 0.7953667953667954,
+    "balanced_accuracy": 0.779415884577672,
+    "confusion_matrix": [
+      [
+        54,
+        12,
+        4,
+        0,
+        0
+      ],
+      [
+        16,
+        13,
+        15,
+        6,
+        1
+      ],
+      [
+        7,
+        8,
+        37,
+        65,
+        4
+      ],
+      [
+        0,
+        7,
+        19,
+        120,
+        28
+      ],
+      [
+        0,
+        1,
+        3,
+        34,
+        24
+      ]
+    ],
+    "predicted_counts": [
+      77,
+      41,
+      78,
+      225,
+      57
+    ],
+    "actual_counts": [
+      70,
+      51,
+      121,
+      174,
+      62
+    ],
+    "per_class_recall": [
+      0.7714285714285715,
+      0.2549019607843137,
+      0.30578512396694213,
+      0.6896551724137931,
+      0.3870967741935484
+    ],
+    "min_prediction": 8.57322447700426e-05,
+    "max_prediction": 0.9827224016189575
+  }
+}

@@ -1,0 +1,80 @@
+[
+  {
+    "condition": "L1",
+    "runs": 5,
+    "config": {
+      "aggregator": "gru",
+      "gru_order": "fixed",
+      "num_layers": 1,
+      "lr": 0.01,
+      "epochs": 100,
+      "folds": 5,
+      "val_ratio": 0.15
+    },
+    "device": "cuda",
+    "parameters": 124354,
+    "val_rmse_mean": 0.059705241769552234,
+    "val_rmse_std": 0.0003939032652999753,
+    "val_mae_mean": 0.03584882766008377,
+    "val_mae_std": 0.0014417576880666094,
+    "test_rmse_mean": 0.05757852718234062,
+    "test_rmse_std": 0.0011928082943716155,
+    "test_mae_mean": 0.03507460355758667,
+    "test_mae_std": 0.0005932102997434572,
+    "final_train_loss_mean": 0.0035004272125661374,
+    "final_train_loss_std": 7.875626472880455e-05,
+    "best_val_epoch_mean": 98.0
+  },
+  {
+    "condition": "L3",
+    "runs": 5,
+    "config": {
+      "aggregator": "gru",
+      "gru_order": "fixed",
+      "num_layers": 3,
+      "lr": 0.01,
+      "epochs": 100,
+      "folds": 5,
+      "val_ratio": 0.15
+    },
+    "device": "cuda",
+    "parameters": 257986,
+    "val_rmse_mean": 0.05973828062415123,
+    "val_rmse_std": 0.0014801836145807016,
+    "val_mae_mean": 0.03547998815774918,
+    "val_mae_std": 0.0005170134617338517,
+    "test_rmse_mean": 0.05786943882703781,
+    "test_rmse_std": 0.002125117353743754,
+    "test_mae_mean": 0.03494634404778481,
+    "test_mae_std": 0.0009214261873619186,
+    "final_train_loss_mean": 0.003461322980001569,
+    "final_train_loss_std": 0.00025496879983356933,
+    "best_val_epoch_mean": 96.8
+  },
+  {
+    "condition": "L2",
+    "runs": 5,
+    "config": {
+      "aggregator": "gru",
+      "gru_order": "fixed",
+      "num_layers": 2,
+      "lr": 0.01,
+      "epochs": 100,
+      "folds": 5,
+      "val_ratio": 0.15
+    },
+    "device": "cuda",
+    "parameters": 191170,
+    "val_rmse_mean": 0.059887994825839994,
+    "val_rmse_std": 0.00043866522208895636,
+    "val_mae_mean": 0.03638956770300865,
+    "val_mae_std": 0.0016619511581950465,
+    "test_rmse_mean": 0.057354817539453505,
+    "test_rmse_std": 0.0009759088873345696,
+    "test_mae_mean": 0.03513901606202126,
+    "test_mae_std": 0.0006161184679962776,
+    "final_train_loss_mean": 0.0034720115829259155,
+    "final_train_loss_std": 9.286554681486738e-05,
+    "best_val_epoch_mean": 95.0
+  }
+]
