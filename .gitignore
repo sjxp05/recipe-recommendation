@@ -18,3 +18,7 @@ tmp/
 data/stage1/
 data/stage2/
 data/v3/
+
+results/experiments/04_tags/*/
+results/experiments/06_finetuned_encoder/*/
+results/experiments/07_learning_curve/*/
