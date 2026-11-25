@@ -39,7 +39,7 @@ def parse_list(value: str, label: str) -> list[str]:
 
 
 def load_pair_recipes(path: Path):
-    from training.stage1 import split_pairs
+    from training.stage1_backup import split_pairs
 
     with path.open(encoding="utf-8-sig", newline="") as handle:
         rows = list(csv.DictReader(handle))

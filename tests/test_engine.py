@@ -11,10 +11,11 @@ from src.engine import (
     REV_CONTRIBUTION,
     SIMILAR,
     IngredientLinkEncoder,
-    OrderedRecipeEncoder,
-    RecipeEncoder,
+    RecipePairGraphSAGE,
     WeightedSAGEConv,
     find_recipes_by_ingredient,
+    load_recipe_model,
+    sha256,
 )
 from training.data import build_graph
 from training.stage2 import train
@@ -76,13 +77,14 @@ def add_predicted_contribution(data, recipe_id, ingredient_id, weight):
 
 def train_toy_recipe_encoder(data):
     # 엔진 테스트용 작은 그래프. 실제 1단계 학습은 CSV 워크플로에서 수행한다.
-    model = RecipeEncoder(2, 8)
+    model = RecipePairGraphSAGE(2, 8, 0.0)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
     pairs = torch.tensor([[1, 4, 0, 2], [2, 5, 3, 5]])
     labels = torch.tensor([0.75, 0.5, 0.0, 0.25])
     for _ in range(35):
         optimizer.zero_grad()
-        loss = F.mse_loss(model.score(model(data), pairs).sigmoid(), labels)
+        # score()는 이미 0~1 유사도를 반환 (sigmoid 불필요)
+        loss = F.mse_loss(model.score(model(data), pairs), labels)
         loss.backward()
         optimizer.step()
     return model
@@ -90,16 +92,60 @@ def train_toy_recipe_encoder(data):
 
 class EngineTests(unittest.TestCase):
     def test_ordered_recipe_encoder_distinguishes_reversed_windows(self):
-        from training.stage1 import _graph
+        from training.stage1_backup import _graph
 
         windows = torch.tensor([[[1.0, 0.0], [0.0, 1.0]],
                                 [[0.0, 1.0], [1.0, 0.0]]])
         data = _graph(windows.mean(1), [], windows, torch.tensor([2, 2]))
         torch.manual_seed(7)
-        model = OrderedRecipeEncoder(2, 8)
+        model = RecipePairGraphSAGE(2, 8, 0.0, ordered_windows=True).eval()
         with torch.no_grad():
             embeddings = model(data)
         self.assertFalse(torch.allclose(embeddings[0], embeddings[1]))
+
+    def test_recipe_model_forward_reads_similar_graph(self):
+        torch.manual_seed(3)
+        data, _ = toy_dataset()
+        model = RecipePairGraphSAGE(2, 8, 0.0).eval()
+        with torch.no_grad():
+            from_graph = model(data)
+            direct = model.encode(
+                data["Recipe"].x, data[SIMILAR].edge_index, data[SIMILAR].edge_weight
+            )
+            no_edges = model.encode(
+                data["Recipe"].x, torch.empty((2, 0), dtype=torch.long), torch.empty(0)
+            )
+            scores = model.score(from_graph, torch.tensor([[0, 3], [1, 4]]))
+        self.assertTrue(torch.equal(from_graph, direct))
+        self.assertFalse(torch.allclose(from_graph, no_edges))
+        self.assertTrue(((scores >= 0) & (scores <= 1)).all().item())
+
+    def test_load_recipe_model_restores_rebuild_checkpoint(self):
+        torch.manual_seed(5)
+        data, _ = toy_dataset()
+        model = RecipePairGraphSAGE(2, 8, 0.1, raw_cosine_stats=(0.5, 0.2)).eval()
+        with TemporaryDirectory() as directory:
+            artifact = Path(directory) / "stage1.pt"
+            artifact.write_bytes(b"stage1 data")
+            checkpoint = Path(directory) / "model.pt"
+            # stage1_rebuild.run()이 저장하는 형식
+            torch.save({
+                "model": model.state_dict(), "hidden": 8, "dropout": 0.1,
+                "raw_cosine_feature": True, "raw_cosine_stats": (0.5, 0.2),
+                "no_graph": False, "ordered_windows": False,
+                "artifact_sha256": sha256(artifact),
+            }, checkpoint)
+            loaded = load_recipe_model(checkpoint, data, artifact)
+            self.assertFalse(loaded.training)
+            pairs = torch.tensor([[0, 2], [1, 5]])
+            with torch.no_grad():
+                expected = model.score(model(data), pairs, data["Recipe"].x)
+                actual = loaded.score(loaded(data), pairs, data["Recipe"].x)
+            self.assertTrue(torch.allclose(expected, actual))
+
+            artifact.write_bytes(b"other data")
+            with self.assertRaisesRegex(ValueError, "different data file"):
+                load_recipe_model(checkpoint, data, artifact)
 
     def test_two_stages_rank_unseen_links_and_freeze_recipe_encoder(self):
         torch.manual_seed(7)
@@ -138,7 +184,7 @@ class EngineTests(unittest.TestCase):
             (data["Ingredient"].x, torch.tensor([[0.2, 0.4, 0.4]]))
         )
 
-        recipes = RecipeEncoder(2, 8)
+        recipes = RecipePairGraphSAGE(2, 8, 0.0)
         ingredients = IngredientLinkEncoder(3, 8)
         pair = torch.tensor([[0], [6]])
 
@@ -180,7 +226,7 @@ class EngineTests(unittest.TestCase):
 
     def test_substitutes_return_model_predictions(self):
         data, _ = toy_dataset()
-        recipes = RecipeEncoder(2, 8)
+        recipes = RecipePairGraphSAGE(2, 8, 0.0)
         ingredients = IngredientLinkEncoder(3, 8)
         embeddings = recipes(data)
 
@@ -301,6 +347,19 @@ class EngineTests(unittest.TestCase):
                 contribution_path=path,
             )
             self.assertEqual(top.tolist(), [2, 5])
+
+            # 1단계 모델을 주면 코사인 대신 학습된 쌍 유사도로 순위를 매긴다
+            model = RecipePairGraphSAGE(2, 2, 0.0, raw_cosine_stats=(0.5, 0.2))
+            learned = torch.tensor([0.2, 0.9, 0.6, 0.1])  # 후보 101, 102, 104, 105 순
+            with patch.object(model, "score", return_value=learned) as score:
+                ids, similarities = ingredients.recommend_recipes(
+                    data, embeddings, ingredient_id=4, recipe_id=0,
+                    contribution_path=path, recipe_model=model,
+                )
+            self.assertEqual(score.call_args.args[1].tolist(), [[0, 0, 0, 0], [1, 2, 4, 5]])
+            self.assertTrue(torch.equal(score.call_args.args[2], data["Recipe"].x))
+            self.assertEqual(ids.tolist(), [2, 4, 1, 5])
+            self.assertTrue(torch.allclose(similarities, torch.tensor([0.9, 0.6, 0.2, 0.1])))
 
             # 기준 레시피 자신만 연결된 재료는 후보가 없다
             empty, values = ingredients.recommend_recipes(
@@ -446,7 +505,7 @@ class EngineTests(unittest.TestCase):
 
     def test_predicted_edges_do_not_change_scores(self):
         data, _ = toy_dataset()
-        recipes = RecipeEncoder(2, 8)
+        recipes = RecipePairGraphSAGE(2, 8, 0.0)
         ingredients = IngredientLinkEncoder(3, 8)
         embeddings = recipes(data)
         pair = torch.tensor([[2], [1]])

@@ -18,10 +18,12 @@ from src.engine import (
     CONTRIBUTION_CSV,
     DEVICE,
     IngredientLinkEncoder,
-    RecipeEncoder,
+    load_recipe_model,
 )
 from training.data import (
+    STAGE1_CHECKPOINT,
     STAGE1_EMBEDDINGS,
+    STAGE2_CHECKPOINT,
     STAGE2_EMBEDDINGS,
     load_dataset,
     prepare_stage2,
@@ -99,9 +101,9 @@ def train(
 
 
 def prepare(args: argparse.Namespace) -> None:
-    from src.engine import BGETextEncoder
+    from src.engine import GTETextEncoder
 
-    encoder = BGETextEncoder()
+    encoder = GTETextEncoder()
     artifact = prepare_stage2(
         lambda texts: encoder.encode_texts(
             texts, batch_size=args.batch_size, show_progress_bar=True
@@ -128,14 +130,9 @@ def train_command(args: argparse.Namespace) -> None:
         raise ValueError("epochs, lr and folds must be positive")
     data, targets = load_dataset(args.stage1_data, args.data)
     data = data.to(DEVICE)
-    stage1 = torch.load(args.stage1_data, map_location="cpu", weights_only=True)
-    saved = torch.load(args.stage1_checkpoint, map_location="cpu", weights_only=True)
-    if saved["recipe_features"] != data["Recipe"].x.shape[1]:
-        raise ValueError("recipe feature width differs from the stage-1 checkpoint")
-    if "data_seed" in saved and saved["data_seed"] != stage1["seed"]:
-        raise ValueError("stage-1 checkpoint does not match the stage-1 embeddings")
-    recipe_model = RecipeEncoder(saved["recipe_features"], saved["hidden"]).to(DEVICE)
-    recipe_model.load_state_dict(saved["model"])
+    # 체크포인트의 학습 데이터 해시가 --stage1-data 파일과 다르면 거부
+    recipe_model = load_recipe_model(args.stage1_checkpoint, data, args.stage1_data)
+    hidden = recipe_model.norm2.normalized_shape[0]
     model, loss = train(
         data,
         targets,
@@ -148,7 +145,7 @@ def train_command(args: argparse.Namespace) -> None:
     checkpoint = {
         # GPU가 없는 환경에서도 읽을 수 있도록 CPU 텐서로 저장
         "model": {k: v.cpu() for k, v in model.state_dict().items()},
-        "hidden": saved["hidden"],
+        "hidden": hidden,
         "ingredient_features": data["Ingredient"].x.shape[1],
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)
@@ -172,11 +169,9 @@ def main() -> None:
     train_parser.add_argument("--stage1-data", type=Path, default=STAGE1_EMBEDDINGS)
     train_parser.add_argument("--data", type=Path, default=STAGE2_EMBEDDINGS)
     train_parser.add_argument(
-        "--stage1-checkpoint", type=Path, default=Path("checkpoints/stage1.pt")
+        "--stage1-checkpoint", type=Path, default=STAGE1_CHECKPOINT
     )
-    train_parser.add_argument(
-        "--output", type=Path, default=Path("checkpoints/stage2.pt")
-    )
+    train_parser.add_argument("--output", type=Path, default=STAGE2_CHECKPOINT)
     train_parser.add_argument("--epochs", type=int, default=100)
     train_parser.add_argument("--folds", type=int, default=5)
     train_parser.add_argument("--lr", type=float, default=0.01)

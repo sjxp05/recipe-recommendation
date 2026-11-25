@@ -12,6 +12,8 @@ from __future__ import annotations
 
 import argparse
 import csv
+import io
+import sys
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
@@ -20,18 +22,24 @@ import torch
 from torch import Tensor
 from torch_geometric.data import HeteroData
 
-from src.engine import CONTRIBUTION_CSV, DEVICE, IngredientLinkEncoder, RecipeEncoder
+from src.engine import (
+    CONTRIBUTION_CSV,
+    DEVICE,
+    IngredientLinkEncoder,
+    RecipePairGraphSAGE,
+    load_recipe_model,
+)
 from training.data import (
+    STAGE1_CHECKPOINT,
+    STAGE1_EMBEDDINGS,
+    STAGE2_CHECKPOINT,
+    STAGE2_EMBEDDINGS,
     load_dataset,
     read_contributions,
     set_contributions,
 )
 
 RECIPES_CSV = Path("data/stage1/v3/recipes_masked_v3.csv")
-STAGE1_EMBEDDINGS = Path("artifacts/stage1_embeddings_v3.pt")
-STAGE2_EMBEDDINGS = Path("artifacts/stage2_embeddings.pt")
-STAGE1_CHECKPOINT = Path("checkpoints/stage1.pt")
-STAGE2_CHECKPOINT = Path("checkpoints/stage2.pt")
 
 
 class Quit(Exception):
@@ -42,7 +50,8 @@ class Quit(Exception):
 class App:
     data: HeteroData
     recipe_embeddings: Tensor
-    model: IngredientLinkEncoder
+    recipe_model: RecipePairGraphSAGE  # 1단계: 레시피 쌍 유사도
+    model: IngredientLinkEncoder  # 2단계: 레시피-재료 기여도
     recipe_index: dict[str, int]  # 원본 레시피 ID -> Recipe 노드 번호
     ingredient_index: dict[str, int]  # 재료 이름 -> Ingredient 노드 번호
     contributions: dict[
@@ -66,8 +75,8 @@ def _read_recipe_names(path: Path) -> dict[str, str]:
 
 def load_app(args: argparse.Namespace) -> App:
     required = {
-        args.stage1_data: "python -m training.stage1 prepare",
-        args.stage1_checkpoint: "python -m training.stage1 train",
+        args.stage1_data: None,
+        args.stage1_checkpoint: "python -m training.stage1 train --data <1단계 데이터> --out <폴더>",
         args.data: "python -m training.stage2 prepare",
         args.stage2_checkpoint: "python -m training.stage2 train",
         args.recipes: None,
@@ -94,20 +103,19 @@ def load_app(args: argparse.Namespace) -> App:
     set_contributions(data, pairs, weights)
     data = data.to(DEVICE)
 
-    stage1 = torch.load(args.stage1_checkpoint, map_location="cpu", weights_only=True)
+    try:
+        recipe_model = load_recipe_model(args.stage1_checkpoint, data, args.stage1_data)
+    except ValueError as error:
+        raise SystemExit(f"1단계 체크포인트를 쓸 수 없습니다: {error}")
     stage2 = torch.load(args.stage2_checkpoint, map_location="cpu", weights_only=True)
-    if (
-        stage1["recipe_features"] != data["Recipe"].x.shape[1]
-        or stage2["ingredient_features"] != data["Ingredient"].x.shape[1]
-    ):
+    if stage2["ingredient_features"] != data["Ingredient"].x.shape[1]:
         raise SystemExit("체크포인트와 데이터의 특징 차원이 맞지 않습니다")
-    if stage1["hidden"] != stage2["hidden"]:
-        raise SystemExit("1단계와 2단계 체크포인트의 hidden 크기가 다릅니다")
-    recipe_model = RecipeEncoder(stage1["recipe_features"], stage1["hidden"]).to(DEVICE)
+    if recipe_model.norm2.normalized_shape[0] != stage2["hidden"]:
+        raise SystemExit(
+            "1단계와 2단계 체크포인트의 hidden 크기가 다릅니다 (2단계를 다시 학습하세요)"
+        )
     model = IngredientLinkEncoder(stage2["ingredient_features"], stage2["hidden"]).to(DEVICE)
-    recipe_model.load_state_dict(stage1["model"])
     model.load_state_dict(stage2["model"])
-    recipe_model.eval()
     model.eval()
     with torch.no_grad():
         recipe_embeddings = recipe_model(data)
@@ -121,6 +129,7 @@ def load_app(args: argparse.Namespace) -> App:
     return App(
         data=data,
         recipe_embeddings=recipe_embeddings,
+        recipe_model=recipe_model,
         model=model,
         recipe_index={rid: i for i, rid in enumerate(data["Recipe"].raw_id)},
         ingredient_index={
@@ -181,6 +190,7 @@ def find_recipes(app: App, recipe_id: str, ingredient: str) -> list[tuple[str, f
         recipe_id=app.recipe_index[recipe_id],
         top_k=app.top_k,
         contribution_path=app.contribution_path,
+        recipe_model=app.recipe_model,
     )
     raw_ids = app.data["Recipe"].raw_id
     return [
@@ -264,6 +274,9 @@ def main() -> None:
     args = parser.parse_args()
     if args.top_k < 1:
         parser.error("--top-k는 1 이상이어야 합니다")
+    if not sys.stdin.isatty() and isinstance(sys.stdin, io.TextIOWrapper):
+        # PowerShell 파이프 등으로 들어온 입력 앞의 BOM 제거
+        sys.stdin.reconfigure(encoding="utf-8-sig")
 
     print("모델과 데이터를 불러오는 중...")
     app = load_app(args)
