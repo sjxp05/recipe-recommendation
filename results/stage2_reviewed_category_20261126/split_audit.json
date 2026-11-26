@@ -1,0 +1,34 @@
+{
+  "original": {
+    "nodes": 1270,
+    "train": 14159,
+    "val": 2499,
+    "test": 2939,
+    "val_reference": {
+      "constant_rmse": 0.09133064898266967,
+      "ingredient_mean_rmse": 0.07294869183915367,
+      "unseen_ingredient_edges": 71
+    },
+    "test_reference": {
+      "constant_rmse": 0.08886177029191997,
+      "ingredient_mean_rmse": 0.06998223971304465,
+      "unseen_ingredient_edges": 76
+    }
+  },
+  "new": {
+    "nodes": 2143,
+    "train": 19513,
+    "val": 3444,
+    "test": 4051,
+    "val_reference": {
+      "constant_rmse": 0.09680761495136002,
+      "ingredient_mean_rmse": 0.06957820077000619,
+      "unseen_ingredient_edges": 158
+    },
+    "test_reference": {
+      "constant_rmse": 0.09484392183926982,
+      "ingredient_mean_rmse": 0.06755862696395165,
+      "unseen_ingredient_edges": 147
+    }
+  }
+}

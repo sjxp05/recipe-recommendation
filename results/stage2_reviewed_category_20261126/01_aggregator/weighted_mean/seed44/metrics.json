@@ -1,0 +1,26 @@
+{
+  "settings": {
+    "aggregator": "weighted_mean",
+    "gru_order": "fixed",
+    "num_layers": 1,
+    "lr": 0.01,
+    "epochs": 100,
+    "folds": 5,
+    "val_ratio": 0.15,
+    "seed": 44,
+    "device": "cuda"
+  },
+  "final_train_loss": 0.0033473677467554808,
+  "best_val_epoch": 97,
+  "parameters": 74050,
+  "val": {
+    "n": 3444,
+    "mae": 0.03540663793683052,
+    "rmse": 0.06067444384098053
+  },
+  "test": {
+    "n": 4051,
+    "mae": 0.03516120836138725,
+    "rmse": 0.06021803244948387
+  }
+}

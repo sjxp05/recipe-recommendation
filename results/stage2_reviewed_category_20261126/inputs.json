@@ -1,0 +1,36 @@
+{
+  "source_sha256": {
+    "labeled_pairs_jihee_masked_category_test.csv": "0a06934e69df1ce102df4a2b5e28341334e4fbe64b69dcd976ad88f0f768bcca",
+    "recipe_slot_category_overrides.csv": "32e81e42098263b091b76c636e5be08bbb2c94a2e6de73c3b3d896fe6d73cfac",
+    "ingredient_category_map.csv": "11a107a96f6205a21eac60df83b3226c88be5b317eeb9eb60b3a4bb33c0a30e1",
+    "manual_ingredient_features_reviewed_v2.csv": "c9aed505bb9c817978215d38c2dd7ceb28ebed7449e0032f4f2c7919ad833496",
+    "stage1_rebuild_raw_gte.pt": "ec1cb2923a49a9a7007101abe164e5fba31115409d752c3728781c89770d98f0",
+    "stage1_rebuild_raw_gte_h64.pt": "24936a9999d3fef7e2ffa24647b4ba2811c4fe0b58b63b909444688f0f46be3b",
+    "stage2_graph_experiments.ipynb": "3f9cb77a2b744ce4212562b7ba60e9b9302ef31b836736a24c74717e136f3a21"
+  },
+  "graph_sha256": "0e51270fe68cd2f44a858a15e683938da8dbe3c1ab0dbc0c87e1b27d5aa69881",
+  "source_recipes": 2916,
+  "stage1_recipes": 2914,
+  "recipes_with_edges": 2914,
+  "ingredient_nodes": 2143,
+  "category_count": 250,
+  "missing_category_nodes": 5,
+  "edges": 27008,
+  "counts": {
+    "input_slots": 27124,
+    "missing_category_slots": 9,
+    "collapsed_slots": 81,
+    "missing_id_slots": 35,
+    "reviewed_slots": 1
+  },
+  "overrides_total": 117,
+  "unmapped_contribution_sum": 6.628332999999999,
+  "max_aggregation_error": 0.0,
+  "split_seed": 42,
+  "split_sizes": {
+    "train": 22957,
+    "test": 4051
+  },
+  "gpu": "NVIDIA GeForce RTX 4060 Laptop GPU",
+  "torch": "2.12.1+cu130"
+}
