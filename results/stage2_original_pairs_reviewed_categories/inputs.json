@@ -1,0 +1,30 @@
+{
+  "source_sha256": {
+    "stage2_embeddings.pt": "caa1486a46300471dd78501a2df9aca959a66c4476a736977144a70102528642",
+    "stage1_rebuild_raw_gte_h64.pt": "24936a9999d3fef7e2ffa24647b4ba2811c4fe0b58b63b909444688f0f46be3b",
+    "stage1_rebuild_raw_gte.pt": "ec1cb2923a49a9a7007101abe164e5fba31115409d752c3728781c89770d98f0",
+    "ingredient_category_map.csv": "11a107a96f6205a21eac60df83b3226c88be5b317eeb9eb60b3a4bb33c0a30e1",
+    "ingredient_name_old_new_simple.csv": "fbead1d4b2d57f633a884ba001b1a4dba21905a458a6651281a4e09672475396",
+    "ingredient_name_mapping.csv": "84ed681018f1665c9f3ae05d120f89a52a10daecff27f00895ec8abed6962766",
+    "stage2_graph_experiments.ipynb": "3f9cb77a2b744ce4212562b7ba60e9b9302ef31b836736a24c74717e136f3a21"
+  },
+  "graph_sha256": "018e7a2a203e878def0c21e62ea01862bc1ebc464af5fc80200c0c0f3bd09ad3",
+  "nodes": 1270,
+  "split_sizes": {
+    "train": 14159,
+    "val": 2499,
+    "test": 2939
+  },
+  "recipe_embeddings_identical": true,
+  "edge_indices_weights_order_identical": true,
+  "source_counts": {
+    "exact": 1052,
+    "normalized_alias": 197,
+    "name_only": 21
+  },
+  "multi_category_nodes": 19,
+  "old_feature_reencode_min_cosine": 0.9999576807022095,
+  "old_feature_reencode_max_abs": 0.001228025183081627,
+  "gpu": "NVIDIA GeForce RTX 4060 Laptop GPU",
+  "torch_version": "2.12.1+cu130"
+}

@@ -1,0 +1,1271 @@
+ingredient,original_category,new_category_ids,new_category_text,source
+acorn squash,vegetables,C021,Vegetables,exact
+active dry yeast,leavening_agents,C262,Leavener (cooking state unspecified),exact
+adobo sauce,sauces_seasoning_liquids,C015,Sauce or dressing,exact
+adobo seasoning,spices_seasonings,C023,Spice (cooking state inapplicable),exact
+agave syrup,sweeteners,C026,Sugar or sweetener (cooking state inapplicable),exact
+aioli,sauces_seasoning_liquids,C015,Sauce or dressing,exact
+alfalfa sprout,vegetables,C021,Vegetables,exact
+alfredo sauce,sauces_seasoning_liquids,C015,Sauce or dressing,exact
+all-bran cereal,grains_starches,C032,Grain cereal,exact
+all-purpose flour,grains_starches,C034,Milled grain flour,exact
+allspice berry,spices_seasonings,C023,Spice (cooking state inapplicable),exact
+almond,nuts_seeds,C042|C129,Cooked nuts or seeds or Nuts and seeds,normalized_alias
+almond extract,baking_flavoring_ingredients,C040,Flavoring or extract,exact
+almond joy candy bar,baking_flavoring_ingredients,C024,Confectionery,normalized_alias
+almond milk,beverages_juices,C037,Nut or seed milk,exact
+almond paste,nuts_seeds,C045,Nut or seed paste,exact
+alphabet pasta,grains_starches,C020,Grain noodles or pasta,exact
+aluminum foil,,C049,Nonfood kitchen supplies,exact
+amaretto liqueur,beverages_juices,C008,Alcoholic beverage,exact
+american cheese,dairy,C002,Dairy cheese,exact
+ancho chili powder,spices_seasonings,C052,Dried ground spice,normalized_alias
+anchovy,seafood,C027,Fish,exact
+anchovy paste,seafood,C056,Fish seasoning paste,exact
+andouille sausage,meat,C036,Formed meat product,exact
+angel food cake,grains_starches,C057,Baked grain cake,exact
+angel hair pasta,grains_starches,C020,Grain noodles or pasta,exact
+angostura bitters,beverages_juices,C008,Alcoholic beverage,exact
+anise seed,spices_seasonings,C023,Spice (cooking state inapplicable),exact
+apple,fruits,C062,Fruit,exact
+apple butter,fruits,C063,Cooked fruit puree spread,exact
+apple cider,beverages_juices,C047,Juice,exact
+apple cider vinegar,sauces_seasoning_liquids,C017,Fermented vinegar,exact
+apple juice,beverages_juices,C047,Juice,exact
+apple juice concentrate,beverages_juices,C065,Juice concentrate,exact
+apple pie spice,spices_seasonings,C023,Spice (cooking state inapplicable),exact
+apple schnapps,beverages_juices,C008,Alcoholic beverage,exact
+applejack,beverages_juices,C008,Alcoholic beverage,exact
+applesauce,fruits,C067,Fruit puree,exact
+apricot,fruits,C062,Fruit,exact
+apricot jell-o,fruits,,,name_only
+arborio rice,grains_starches,C007,Grain kernels,exact
+arrowroot,grains_starches,C072,Starchy roots and tubers,exact
+artichoke,vegetables,C021,Vegetables,exact
+artichoke heart,vegetables,C021,Vegetables,exact
+arugula,vegetables,C021,Vegetables,exact
+asafoetida,spices_seasonings,C023,Spice (cooking state inapplicable),normalized_alias
+ascorbic acid,spices_seasonings,C019,Food additive (cooking state unspecified),exact
+asiago cheese,dairy,C002,Dairy cheese,exact
+asian chili sauce,sauces_seasoning_liquids,C015,Sauce or dressing,exact
+asparagus,vegetables,C021,Vegetables,exact
+avocado,fruits,C062,Fruit,exact
+baby artichoke,vegetables,C021,Vegetables,exact
+baby back rib,meat,C077,Pork,normalized_alias
+baby carrot,vegetables,C021,Vegetables,normalized_alias
+baby spinach,vegetables,C021,Vegetables,exact
+bacon,meat,C077,Pork,exact
+bacon bit,meat,C077,Pork,normalized_alias
+bacon grease,fats_oils,C081,Solid cooking fat,exact
+bagel,grains_starches,C011,Baked grain bread,exact
+baguette,grains_starches,C011,Baked grain bread,exact
+baked bean,legumes,C084,Cooked legumes,normalized_alias
+baked tofu,legumes,C086,Cooked tofu,exact
+baking mix,grains_starches,C058,Grain-based dry mix,exact
+baking powder,leavening_agents,C091,Powdered leavener,exact
+baking soda,leavening_agents,C089,Leavener (cooking state inapplicable),exact
+balsamic vinegar,sauces_seasoning_liquids,C017,Fermented vinegar,exact
+bamboo shoot,vegetables,C021,Vegetables,exact
+bamboo skewer,,C049,Nonfood kitchen supplies,exact
+bamboo skewers,,C049,Nonfood kitchen supplies,exact
+banana,fruits,C062,Fruit,exact
+banana extract,baking_flavoring_ingredients,C040,Flavoring or extract,exact
+banana yogurt,dairy,C093,Cultured dairy yogurt,exact
+barbecue sauce,sauces_seasoning_liquids,C015,Sauce or dressing,exact
+barley,grains_starches,C007,Grain kernels,exact
+barley malt syrup,grains_starches,C026,Sugar or sweetener (cooking state inapplicable),exact
+basil,spices_seasonings,C060,Herbs,exact
+basmati rice,grains_starches,C007,Grain kernels,exact
+batter,grains_starches,C054,Uncooked grain product,exact
+bay leaf,spices_seasonings,C060,Herbs,exact
+bay scallop,seafood,C078,Mollusks,exact
+bean,legumes,C010,Legumes,normalized_alias
+bean sprout,vegetables,C021,Vegetables,normalized_alias
+beau monde seasoning,spices_seasonings,C023,Spice (cooking state inapplicable),exact
+beef,meat,C061,Beef,exact
+beef back rib,meat,C061,Beef,normalized_alias
+beef bouillon,water_broth,C108,Bouillon concentrate,exact
+beef brisket,meat,C061,Beef,exact
+beef broth,water_broth,C102,Broth or stock,exact
+beef chuck,meat,C061,Beef,exact
+beef drippings,fats_oils,C081,Solid cooking fat,exact
+beef liver,meat,C112,Beef offal,exact
+beef ravioli,grains_starches,C114,Grain pasta with beef,exact
+beef roast,meat,C061,Beef,exact
+beef round tip steak,meat,C061,Beef,exact
+beef short rib,meat,C061,Beef,exact
+beef tenderloin,meat,C061,Beef,exact
+beer,beverages_juices,C029,Fermented alcoholic beverage,exact
+beet,vegetables,C021,Vegetables,exact
+belgian endive,vegetables,C021,Vegetables,exact
+bell pepper,vegetables,C021,Vegetables,exact
+berry,fruits,C062,Fruit,normalized_alias
+biscotti,grains_starches,C039,Baked grain cookie,exact
+biscuit,grains_starches,C009,Grain products,exact
+bittersweet chocolate,baking_flavoring_ingredients,C024,Confectionery,exact
+black bean,legumes,C010,Legumes,normalized_alias
+black bean sauce,sauces_seasoning_liquids,C015,Sauce or dressing,exact
+black cherry,fruits,C062,Fruit,normalized_alias
+black cherry syrup,sweeteners,C026,Sugar or sweetener (cooking state inapplicable),normalized_alias
+black decorating gel,baking_flavoring_ingredients,C024,Confectionery,exact
+black forest ham,meat,C077,Pork,exact
+black olive,vegetables,C062|C123,Fruit or Pickled fruit,normalized_alias
+black pepper,spices_seasonings,C023,Spice (cooking state inapplicable),exact
+black peppercorn,spices_seasonings,C023,Spice (cooking state inapplicable),normalized_alias
+black sesame seed,nuts_seeds,C042,Nuts and seeds,exact
+black tea,beverages_juices,C127,Dried beverage ingredient,exact
+black truffle,vegetables,C124,Mushrooms,exact
+black walnut,nuts_seeds,C042,Nuts and seeds,exact
+black-eyed pea,legumes,C010,Legumes,normalized_alias
+blackberry,fruits,C062,Fruit,exact
+blackberry wine,beverages_juices,C029,Fermented alcoholic beverage,exact
+blackstrap molasses,sweeteners,C026,Sugar or sweetener (cooking state inapplicable),exact
+blue cheese,dairy,C002,Dairy cheese,exact
+blue cheese dressing,sauces_seasoning_liquids,C015,Sauce or dressing,exact
+blue corn tortilla,grains_starches,C011,Baked grain bread,exact
+blue curacao,beverages_juices,C008,Alcoholic beverage,exact
+blueberry,fruits,C062,Fruit,normalized_alias
+boboli pizza crust,grains_starches,C011,Baked grain bread,exact
+bok choy,vegetables,C021,Vegetables,exact
+borlotti bean,legumes,C010,Legumes,normalized_alias
+boston lettuce,vegetables,C021,Vegetables,exact
+bouillon,water_broth,C108,Bouillon concentrate,exact
+bouquet garni,spices_seasonings,C060,Herbs,exact
+bourbon whiskey,beverages_juices,C008,Alcoholic beverage,exact
+bran flake,grains_starches,C032,Grain cereal,normalized_alias
+brandy,beverages_juices,C008,Alcoholic beverage,exact
+bratwurst,meat,C036,Formed meat product,exact
+brazil nut,nuts_seeds,C042,Nuts and seeds,exact
+bread,grains_starches,C011,Baked grain bread,exact
+bread cube,grains_starches,C011,Baked grain bread,normalized_alias
+bread dough,grains_starches,C097,Unbaked grain bread dough,exact
+bread flour,grains_starches,C034,Milled grain flour,exact
+breaded chicken patty,poultry,C140,Breaded formed poultry,normalized_alias
+breakfast sausage,meat,C036,Formed meat product,exact
+brewed coffee,beverages_juices,C012,Beverage,exact
+brie cheese,dairy,C002,Dairy cheese,exact
+broccoli,vegetables,C021,Vegetables,exact
+broccoli coleslaw mix,vegetables,C021,Vegetables,exact
+broccoli stem,vegetables,C021,Vegetables,exact
+broth,water_broth,C102,Broth or stock,exact
+brown basmati rice,grains_starches,C007,Grain kernels,exact
+brown bean sauce,sauces_seasoning_liquids,C015,Sauce or dressing,exact
+brown lentil,legumes,C010|C250,Dried legumes or Legumes,normalized_alias
+brown rice,grains_starches,C007,Grain kernels,exact
+brown sugar,sweeteners,C026,Sugar or sweetener (cooking state inapplicable),exact
+brown sugar substitute,sweeteners,C026,Sugar or sweetener (cooking state inapplicable),exact
+brownie mix,grains_starches,C058,Grain-based dry mix,exact
+browning sauce,sauces_seasoning_liquids,C015,Sauce or dressing,exact
+brussels sprout,vegetables,C021,Vegetables,exact
+bucatini pasta,grains_starches,C020,Grain noodles or pasta,exact
+buffalo wing sauce,sauces_seasoning_liquids,C015,Sauce or dressing,exact
+bulgur,grains_starches,C147,Cooked and dried grain kernels,exact
+butter,dairy,C148,Dairy butter,exact
+butter cracker,grains_starches,C105,Baked grain crackers,normalized_alias
+butter pecan cake mix,grains_starches,C058,Grain-based dry mix,exact
+butter recipe cake mix,grains_starches,C058,Grain-based dry mix,exact
+buttermilk,dairy,C001,Milk,exact
+butternut squash,vegetables,C021,Vegetables,exact
+butterscotch chip,baking_flavoring_ingredients,C024,Confectionery,normalized_alias
+butterscotch schnapps,beverages_juices,C008,Alcoholic beverage,exact
+cabbage,vegetables,C021,Vegetables,exact
+caesar ranch mayonnaise,sauces_seasoning_liquids,C015,Sauce or dressing,exact
+cajun seasoning,spices_seasonings,C023,Spice (cooking state inapplicable),exact
+cake,grains_starches,C057,Baked grain cake,exact
+cake flour,grains_starches,C034,Milled grain flour,exact
+canadian bacon,meat,C077,Pork,exact
+canadian whiskey,beverages_juices,C008,Alcoholic beverage,normalized_alias
+candied cherry,fruits,C155,Fruit confectionery,exact
+candied orange peel,fruits,C155,Fruit confectionery,exact
+candy,baking_flavoring_ingredients,C024,Confectionery,exact
+candy cane,baking_flavoring_ingredients,C024,Confectionery,exact
+canned salmon,seafood,C161,Cooked fish,exact
+canned tuna,seafood,C161,Cooked fish,exact
+canned whole tomato,vegetables,C021|C156,Cooked vegetables or Vegetables,normalized_alias
+cannellini bean,legumes,C010,Legumes,normalized_alias
+canola oil,fats_oils,C044,Cooking oil,exact
+cantal cheese,dairy,C002,Dairy cheese,exact
+caper,spices_seasonings,C021|C137,Pickled vegetables or Vegetables,normalized_alias
+caramel,baking_flavoring_ingredients,C024,Confectionery,exact
+caramel sauce,baking_flavoring_ingredients,C015,Sauce or dressing,exact
+caraway seed,nuts_seeds,C023,Spice (cooking state inapplicable),exact
+cardamom pod,spices_seasonings,C023,Spice (cooking state inapplicable),exact
+cardamom seed,spices_seasonings,C023,Spice (cooking state inapplicable),exact
+carrot,vegetables,C021,Vegetables,exact
+cashew,nuts_seeds,C042|C129,Cooked nuts or seeds or Nuts and seeds,normalized_alias
+caster sugar,sweeteners,C026,Sugar or sweetener (cooking state inapplicable),exact
+catalina dressing,sauces_seasoning_liquids,C015,Sauce or dressing,exact
+catfish fillet,seafood,C027,Fish,exact
+catfish nugget,seafood,C027,Fish,normalized_alias
+cauliflower,vegetables,C021,Vegetables,exact
+caviar,seafood,C122,Seafood,exact
+cayenne pepper,spices_seasonings,C023,Spice (cooking state inapplicable),exact
+cedar plank,,C049,Nonfood kitchen supplies,exact
+celeriac,vegetables,C021,Vegetables,exact
+celery,vegetables,C021,Vegetables,exact
+celery salt,spices_seasonings,C126,Salt,exact
+celery seed,spices_seasonings,C023,Spice (cooking state inapplicable),exact
+cereal,grains_starches,C032,Grain cereal,exact
+chambord raspberry liqueur,beverages_juices,C008,Alcoholic beverage,normalized_alias
+champagne,beverages_juices,C029,Fermented alcoholic beverage,exact
+champagne vinegar,sauces_seasoning_liquids,C017,Fermented vinegar,exact
+cheddar cheese,dairy,C002,Dairy cheese,exact
+cheddar garlic biscuit mix,grains_starches,C058,Grain-based dry mix,exact
+cheese,dairy,C002,Dairy cheese,exact
+cheese cracker,grains_starches,C105,Baked grain crackers,normalized_alias
+cheese ravioli,grains_starches,C172,Grain pasta with cheese,exact
+cheese sauce,sauces_seasoning_liquids,C015,Sauce or dressing,exact
+cheese slice,dairy,C002,Dairy cheese,exact
+cheese tortellini,grains_starches,C172,Grain pasta with cheese,exact
+cheesecloth,,C049,Nonfood kitchen supplies,exact
+cherry,fruits,C062,Fruit,normalized_alias
+cherry brandy,beverages_juices,C008,Alcoholic beverage,exact
+cherry pepper,vegetables,C021,Vegetables,exact
+cherry tomato,vegetables,C021,Vegetables,normalized_alias
+chervil,vegetables,C060,Herbs,exact
+chicken,poultry,C079,Poultry,exact
+chicken bouillon,water_broth,C108,Bouillon concentrate,exact
+chicken breast,poultry,C079,Poultry,exact
+chicken broth,water_broth,C102,Broth or stock,exact
+chicken drumstick,poultry,C079,Poultry,exact
+chicken leg,poultry,C079,Poultry,exact
+chicken liver,poultry,C180,Poultry offal,exact
+chicken tender,poultry,C079,Poultry,normalized_alias
+chicken thigh,poultry,C079,Poultry,exact
+chicken wing,poultry,C079,Poultry,normalized_alias
+chickpea,legumes,C010|C250,Dried legumes or Legumes,normalized_alias
+chili,spices_seasonings,C116,Soup,exact
+chili bean,legumes,C010,Legumes,exact
+chili bean sauce,sauces_seasoning_liquids,C099,Legume sauce,exact
+chili paste,sauces_seasoning_liquids,C018,Seasoning paste,exact
+chili pepper,vegetables,C021,Vegetables,exact
+chili powder,spices_seasonings,C071,Ground spice,exact
+chili sauce,sauces_seasoning_liquids,C015,Sauce or dressing,exact
+chili starter,spices_seasonings,,,name_only
+chili with beans,legumes,C084,Cooked legumes,exact
+chili-garlic sauce,sauces_seasoning_liquids,C015,Sauce or dressing,exact
+chinese chives,spices_seasonings,,,name_only
+chinese egg noodle,grains_starches,C189,Grain egg noodles,normalized_alias
+chipotle chili in adobo,vegetables,C191,Smoked vegetables,normalized_alias
+chipotle chili powder,spices_seasonings,C254,Dried ground smoked spice,normalized_alias
+chive and onion cream cheese,dairy,C002,Dairy cheese,normalized_alias
+chives,spices_seasonings,C060,Herbs,exact
+chocolate,baking_flavoring_ingredients,C024,Confectionery,exact
+chocolate bar,baking_flavoring_ingredients,C024,Confectionery,exact
+chocolate cake mix,grains_starches,C058,Grain-based dry mix,exact
+chocolate cookie crumb,grains_starches,C039,Baked grain cookie,exact
+chocolate cookie pie crust,grains_starches,C005,Grain-based pie or tart shell,exact
+chocolate fudge topping,baking_flavoring_ingredients,C015,Sauce or dressing,exact
+chocolate graham cracker,grains_starches,C105,Baked grain crackers,exact
+chocolate graham wafer pie crust,grains_starches,C005,Grain-based pie or tart shell,exact
+chocolate ice cream,dairy,C149,Frozen dessert,exact
+chocolate liqueur,beverages_juices,C008,Alcoholic beverage,exact
+chocolate milk,dairy,C001,Milk,exact
+chocolate peanut butter,baking_flavoring_ingredients,,,name_only
+chocolate sandwich cookie,grains_starches,C039,Baked grain cookie,normalized_alias
+chocolate shaving,baking_flavoring_ingredients,C024,Confectionery,normalized_alias
+chocolate syrup,baking_flavoring_ingredients,C026,Sugar or sweetener (cooking state inapplicable),exact
+chocolate wafer,baking_flavoring_ingredients,C039,Baked grain cookie,exact
+chocolate whipped cream,dairy,C004,Dairy cream,exact
+chocolate-covered english toffee bar,baking_flavoring_ingredients,C024,Confectionery,exact
+chorizo sausage,meat,C036,Formed meat product,exact
+chow mein noodle,grains_starches,C020,Grain noodles or pasta,normalized_alias
+chuck roast,meat,C061,Beef,exact
+cilantro,spices_seasonings,C060,Herbs,exact
+cilantro salsa,sauces_seasoning_liquids,C015,Sauce or dressing,exact
+cinnamon baking chip,baking_flavoring_ingredients,C024,Confectionery,normalized_alias
+cinnamon oil,baking_flavoring_ingredients,C040,Flavoring or extract,exact
+cinnamon raisin bread,grains_starches,C205,Grain bread with fruit and spices,exact
+cinnamon stick,spices_seasonings,C023,Spice (cooking state inapplicable),exact
+cinnamon sugar,sweeteners,C026,Sugar or sweetener (cooking state inapplicable),exact
+clam,seafood,C078,Mollusks,exact
+clam juice,water_broth,C047,Juice,exact
+clarified butter,dairy,C148,Dairy butter,exact
+cocoa powder,baking_flavoring_ingredients,C090,Powdered confectionery ingredient,exact
+coconut,nuts_seeds,C062,Fruit,exact
+coconut extract,baking_flavoring_ingredients,C040,Flavoring or extract,exact
+coconut juice,beverages_juices,C047,Juice,exact
+coconut milk,beverages_juices,C211,Fruit-based plant milk,exact
+coconut oil,fats_oils,C044,Cooking oil,exact
+coconut pecan frosting,baking_flavoring_ingredients,C024,Confectionery,exact
+coconut rum,beverages_juices,C008,Alcoholic beverage,exact
+cod fillet,seafood,C027,Fish,normalized_alias
+cognac,beverages_juices,C008,Alcoholic beverage,exact
+cola,beverages_juices,C012,Beverage,exact
+colby cheese,dairy,C002,Dairy cheese,exact
+colby-monterey jack cheese,dairy,C002,Dairy cheese,exact
+coleslaw mix,grains_starches,C021,Vegetables,exact
+cookie,grains_starches,C039,Baked grain cookie,exact
+cookie crumb,grains_starches,C039,Baked grain cookie,normalized_alias
+cooking fat,fats_oils,C081,Solid cooking fat,exact
+cooking spray,fats_oils,C044,Cooking oil,exact
+coriander,spices_seasonings,C023,Spice (cooking state inapplicable),exact
+coriander seed,spices_seasonings,C023,Spice (cooking state inapplicable),exact
+corn,vegetables,C021,Vegetables,exact
+corn and black bean salsa,sauces_seasoning_liquids,C015,Sauce or dressing,exact
+corn chip,grains_starches,C083,Cooked grain product,normalized_alias
+corn flake,grains_starches,C032,Grain cereal,normalized_alias
+corn flake crumb,grains_starches,C032,Grain cereal,normalized_alias
+corn muffin mix,grains_starches,C058,Grain-based dry mix,exact
+corn oil,fats_oils,C044,Cooking oil,exact
+corn on the cob,vegetables,C021,Vegetables,exact
+corn syrup,sweeteners,C026,Sugar or sweetener (cooking state inapplicable),exact
+corn tortilla,grains_starches,C011,Baked grain bread,exact
+cornbread mix,grains_starches,C058,Grain-based dry mix,exact
+corned beef,meat,C231,Cured beef,exact
+cornish hen,poultry,C079,Poultry,exact
+cornmeal,grains_starches,C034,Milled grain flour,exact
+cornstarch,grains_starches,C233,Isolated grain starch,exact
+cottage cheese,dairy,C002,Dairy cheese,exact
+country ham,meat,C077,Pork,exact
+country-style pork rib,meat,C077,Pork,normalized_alias
+couscous,grains_starches,C020,Grain noodles or pasta,exact
+crab leg,seafood,C080,Crustaceans,normalized_alias
+crabmeat,seafood,C080,Crustaceans,exact
+cracker,grains_starches,C105,Baked grain crackers,exact
+cracker crumb,grains_starches,C105,Baked grain crackers,exact
+cranberry,fruits,C062,Fruit,normalized_alias
+cranberry horseradish,spices_seasonings,,,name_only
+cranberry juice,beverages_juices,C047,Juice,exact
+cranberry sauce,sauces_seasoning_liquids,C076,Fruit sauce,exact
+crawfish tail,seafood,C080,Crustaceans,exact
+cream,dairy,C004,Dairy cream,exact
+cream cheese,dairy,C002,Dairy cheese,exact
+cream of tartar,leavening_agents,C016,Food additive (cooking state inapplicable),exact
+cream soda,beverages_juices,C012,Beverage,exact
+creamed corn,vegetables,C156,Cooked vegetables,exact
+creme de cacao,beverages_juices,C008,Alcoholic beverage,exact
+creme de menthe,beverages_juices,C008,Alcoholic beverage,exact
+creme fraiche,dairy,C143,Cultured dairy cream,exact
+cremini mushroom,vegetables,C124,Mushrooms,exact
+creole seasoning,spices_seasonings,C023,Spice (cooking state inapplicable),exact
+crescent roll dough,grains_starches,C097,Unbaked grain bread dough,exact
+crisp rice cereal,grains_starches,C032,Grain cereal,exact
+crispix cereal,grains_starches,C032,Grain cereal,exact
+crouton,grains_starches,C011,Baked grain bread,exact
+crumb cake mix,grains_starches,C058,Grain-based dry mix,exact
+crushed pineapple,fruits,C062,Fruit,exact
+crushed tomato,vegetables,C021,Vegetables,normalized_alias
+crusty bread,grains_starches,C011,Baked grain bread,exact
+crystallized ginger,spices_seasonings,C024,Confectionery,exact
+cuban bread,grains_starches,C011,Baked grain bread,exact
+cucumber,vegetables,C021,Vegetables,exact
+cumin seed,spices_seasonings,C023,Spice (cooking state inapplicable),exact
+cupcake,grains_starches,C057,Baked grain cake,exact
+curry leaf,spices_seasonings,C060,Herbs,exact
+curry powder,spices_seasonings,C071,Ground spice,exact
+daikon radish,vegetables,C021,Vegetables,exact
+dark beer,beverages_juices,C029,Fermented alcoholic beverage,exact
+dark brown sugar,sweeteners,C026,Sugar or sweetener (cooking state inapplicable),exact
+dark chocolate,baking_flavoring_ingredients,C024,Confectionery,exact
+dark chocolate chip,baking_flavoring_ingredients,C024,Confectionery,normalized_alias
+dark corn syrup,sweeteners,C026,Sugar or sweetener (cooking state inapplicable),exact
+dark molasses,sweeteners,C026,Sugar or sweetener (cooking state inapplicable),exact
+dark rum,beverages_juices,C008,Alcoholic beverage,exact
+dark rye bread,grains_starches,C011,Baked grain bread,exact
+dark soy sauce,sauces_seasoning_liquids,C242,Fermented sauce,exact
+date,fruits,C062|C087,Dried fruit or Fruit,normalized_alias
+delicata squash,vegetables,C021,Vegetables,exact
+demi-glace,water_broth,C092,Concentrated sauce,exact
+diced tomato,vegetables,C021,Vegetables,exact
+diced tomatoes with green chilies,vegetables,C021,Vegetables,exact
+dijon mustard,sauces_seasoning_liquids,C015,Sauce or dressing,exact
+dill,spices_seasonings,C060,Herbs,exact
+dill pickle,vegetables,C137,Pickled vegetables,exact
+dipping chocolate,baking_flavoring_ingredients,C024,Confectionery,exact
+ditalini,grains_starches,C020,Grain noodles or pasta,exact
+double crust pie crust,grains_starches,C005,Grain-based pie or tart shell,exact
+dried ancho chili,spices_seasonings,C055,Dried vegetables,normalized_alias
+dried apple,fruits,C087,Dried fruit,exact
+dried apricot,fruits,C087,Dried fruit,exact
+dried arbol chili,spices_seasonings,C021,Vegetables,normalized_alias
+dried basil,spices_seasonings,C251,Dried herbs,exact
+dried cherry,fruits,C087,Dried fruit,normalized_alias
+dried chipotle chili,vegetables,C253,Dried smoked vegetables,normalized_alias
+dried chives,spices_seasonings,C251,Dried herbs,exact
+dried cilantro,spices_seasonings,C251,Dried herbs,exact
+dried cranberry,fruits,C062|C087,Dried fruit or Fruit,normalized_alias
+dried currant,fruits,C087,Dried fruit,exact
+dried dill,spices_seasonings,C060,Herbs,exact
+dried fig,fruits,C087,Dried fruit,exact
+dried guajillo chili,spices_seasonings,C055,Dried vegetables,normalized_alias
+dried marjoram,spices_seasonings,C251,Dried herbs,exact
+dried minced onion,vegetables,C055,Dried vegetables,normalized_alias
+dried mint,spices_seasonings,C251,Dried herbs,exact
+dried oregano,spices_seasonings,C060,Herbs,exact
+dried parsley,spices_seasonings,C251,Dried herbs,exact
+dried pasilla chili,vegetables,C055,Dried vegetables,normalized_alias
+dried porcini mushroom,vegetables,C124,Mushrooms,normalized_alias
+dried red chili,spices_seasonings,C021,Vegetables,exact
+dried rosemary,spices_seasonings,C251,Dried herbs,exact
+dried sage,spices_seasonings,C251,Dried herbs,exact
+dried shiitake mushroom,vegetables,C124,Mushrooms,exact
+dried shrimp paste,seafood,C260,Dried crustacean seasoning paste,exact
+dried tarragon,spices_seasonings,C251,Dried herbs,exact
+dried thyme,spices_seasonings,C251,Dried herbs,exact
+dried whole corn,vegetables,C222,Dried grain kernels,exact
+dried wild mushroom,vegetables,C252,Dried mushrooms,normalized_alias
+dry breadcrumb,grains_starches,C139,Crumbs from baked grain bread,normalized_alias
+dry sherry,beverages_juices,C008,Alcoholic beverage,exact
+duck breast,poultry,C079,Poultry,exact
+dutch-processed cocoa powder,baking_flavoring_ingredients,C090,Powdered confectionery ingredient,exact
+edamame,legumes,C010,Legumes,exact
+edible flower,vegetables,,,name_only
+egg,eggs,C273,Whole egg,exact
+egg noodle,grains_starches,C073|C189,Grain egg noodles or Noodles or pasta (base unspecified),normalized_alias
+egg roll wrap,grains_starches,C054,Uncooked grain product,exact
+egg substitute,eggs,C274,Egg substitute,exact
+egg white,eggs,C276,Egg white,exact
+egg yolk,eggs,C278,Egg yolk,exact
+eggnog,beverages_juices,C279,Dairy beverage,exact
+eggplant,vegetables,C021,Vegetables,exact
+elbow macaroni,grains_starches,C020,Grain noodles or pasta,exact
+elderberry,fruits,C062,Fruit,exact
+empanada wrapper,grains_starches,C248,Unbaked grain pastry dough,normalized_alias
+enchilada sauce,sauces_seasoning_liquids,C015,Sauce or dressing,exact
+english muffin,grains_starches,C011,Baked grain bread,exact
+english mustard,sauces_seasoning_liquids,C015,Sauce or dressing,exact
+escarole,vegetables,C021,Vegetables,exact
+espresso,beverages_juices,C012,Beverage,exact
+evaporated milk,dairy,C220,Concentrated milk,exact
+fajita seasoning mix,spices_seasonings,C023,Spice (cooking state inapplicable),exact
+farfalle pasta,grains_starches,C020,Grain noodles or pasta,exact
+fennel bulb,vegetables,C021,Vegetables,exact
+fennel seed,spices_seasonings,C023,Spice (cooking state inapplicable),exact
+fenugreek leaf,spices_seasonings,C060,Herbs,normalized_alias
+fenugreek seed,spices_seasonings,C023,Spice (cooking state inapplicable),normalized_alias
+fermented black bean,legumes,C283,Fermented legumes,normalized_alias
+feta cheese,dairy,C002,Dairy cheese,exact
+fettuccine pasta,grains_starches,C020,Grain noodles or pasta,exact
+fiber one cereal,grains_starches,C032,Grain cereal,exact
+fig,fruits,C062,Fruit,exact
+fine semolina,grains_starches,C034,Milled grain flour,exact
+firm tofu,legumes,C152,Tofu,exact
+fish,seafood,C027,Fish,exact
+fish roe,seafood,C122,Seafood,exact
+fish sauce,sauces_seasoning_liquids,C242,Fermented sauce,exact
+fish steak,seafood,C027,Fish,normalized_alias
+five-spice powder,spices_seasonings,C071,Ground spice,exact
+flaked coconut,nuts_seeds,C062,Fruit,exact
+flank steak,meat,C061,Beef,exact
+flat-leaf parsley,spices_seasonings,C060,Herbs,normalized_alias
+flax seed,nuts_seeds,C042,Nuts and seeds,exact
+flour tortilla,grains_starches,C011,Baked grain bread,exact
+focaccia bread,grains_starches,C011,Baked grain bread,exact
+foie gras,poultry,C180,Poultry offal,exact
+fontina cheese,dairy,C002,Dairy cheese,exact
+fontinella cheese,dairy,C002,Dairy cheese,exact
+food coloring,baking_flavoring_ingredients,C019,Food additive (cooking state unspecified),exact
+frangelico hazelnut liqueur,beverages_juices,C008,Alcoholic beverage,normalized_alias
+french lentil,legumes,C010,Legumes,normalized_alias
+french vanilla cake mix,grains_starches,C058,Grain-based dry mix,exact
+french-fried onion,vegetables,C156,Cooked vegetables,normalized_alias
+fresh breadcrumb,grains_starches,C139,Crumbs from baked grain bread,exact
+fresh ginger,spices_seasonings,C023,Spice (cooking state inapplicable),exact
+fresh mozzarella cheese,dairy,C002,Dairy cheese,exact
+fresh yeast,leavening_agents,C262,Leavener (cooking state unspecified),exact
+frosting,baking_flavoring_ingredients,C024,Confectionery,exact
+frozen peppers and onions,,C021,Vegetables,exact
+fruit,fruits,C062,Fruit,exact
+fruit bread,grains_starches,C011,Baked grain bread,exact
+fruit chutney,sauces_seasoning_liquids,C076,Fruit sauce,exact
+fruit salsa,sauces_seasoning_liquids,C076,Fruit sauce,exact
+galangal,spices_seasonings,C023,Spice (cooking state inapplicable),exact
+garam masala,spices_seasonings,C023,Spice (cooking state inapplicable),exact
+garlic,vegetables,C021,Vegetables,exact
+garlic butter,dairy,C148,Dairy butter,exact
+garlic paste,vegetables,C187,Vegetable seasoning paste,exact
+garlic pepper seasoning,spices_seasonings,C023,Spice (cooking state inapplicable),exact
+garlic powder,spices_seasonings,C167,Dried vegetable powder,exact
+garlic salt,spices_seasonings,C126,Salt,exact
+garlic seasoning,spices_seasonings,C023,Spice (cooking state inapplicable),exact
+garlic-flavored olive oil,fats_oils,C044,Cooking oil,exact
+genoa salami,meat,C234,Formed pork product,exact
+german chocolate,baking_flavoring_ingredients,C024,Confectionery,exact
+german chocolate cake mix,grains_starches,C058,Grain-based dry mix,exact
+ghee,fats_oils,C148,Dairy butter,exact
+gherkin,vegetables,C137,Pickled vegetables,exact
+ginger,spices_seasonings,C023,Spice (cooking state inapplicable),exact
+ginger ale,beverages_juices,C012,Beverage,exact
+ginger-garlic paste,spices_seasonings,C018,Seasoning paste,exact
+gingersnap cookie,grains_starches,C039,Baked grain cookie,exact
+glaze,baking_flavoring_ingredients,,,name_only
+gluten-free flour,grains_starches,C130,Milled flour (base unspecified),exact
+glutinous-rice flour,grains_starches,C034,Milled grain flour,exact
+gnocchi,grains_starches,C073,Noodles or pasta (base unspecified),exact
+goat cheese,dairy,C002,Dairy cheese,exact
+golden delicious apple,fruits,C062,Fruit,exact
+golden raisin,fruits,C087,Dried fruit,exact
+golden syrup,sweeteners,C026,Sugar or sweetener (cooking state inapplicable),exact
+gorgonzola cheese,dairy,C002,Dairy cheese,normalized_alias
+gouda cheese,dairy,C002,Dairy cheese,exact
+graham cracker,grains_starches,C105,Baked grain crackers,exact
+graham cracker crumb,grains_starches,C105,Baked grain crackers,normalized_alias
+graham cracker pie crust,grains_starches,C005,Grain-based pie or tart shell,exact
+grain alcohol,beverages_juices,C008,Alcoholic beverage,exact
+granny smith apple,fruits,C062,Fruit,exact
+granola cereal,grains_starches,C032,Grain cereal,exact
+granulated garlic,vegetables,C167,Dried vegetable powder,exact
+grape,fruits,C062,Fruit,normalized_alias
+grape leaf,fruits,C021,Vegetables,normalized_alias
+grape tomato,vegetables,C021,Vegetables,normalized_alias
+grapefruit,fruits,C062,Fruit,exact
+grapefruit juice,beverages_juices,C047,Juice,exact
+grapefruit zest,fruits,C062,Fruit,exact
+gravy,sauces_seasoning_liquids,C015,Sauce or dressing,exact
+great northern bean,legumes,C010,Legumes,exact
+greek seasoning,spices_seasonings,C023,Spice (cooking state inapplicable),normalized_alias
+green bean,legumes,C021,Vegetables,normalized_alias
+green bell pepper,vegetables,C021,Vegetables,exact
+green chili,vegetables,C021,Vegetables,exact
+green curry paste,sauces_seasoning_liquids,C018,Seasoning paste,exact
+green enchilada sauce,sauces_seasoning_liquids,C015,Sauce or dressing,exact
+green lentil,legumes,C010,Legumes,exact
+green olive,vegetables,C123,Pickled fruit,normalized_alias
+green onion,vegetables,C021,Vegetables,exact
+green peppercorn,spices_seasonings,C023,Spice (cooking state inapplicable),exact
+green tomato,vegetables,C021,Vegetables,exact
+grenadine,beverages_juices,C026,Sugar or sweetener (cooking state inapplicable),exact
+grits,grains_starches,C232,Ground grain,exact
+ground allspice,spices_seasonings,C023,Spice (cooking state inapplicable),exact
+ground almond,nuts_seeds,C046,Ground nuts or seeds,normalized_alias
+ground beef,meat,C206,Ground beef,exact
+ground buffalo meat,meat,C322,Ground meat,exact
+ground cardamom,spices_seasonings,C071,Ground spice,exact
+ground chicken,poultry,C323,Ground poultry,exact
+ground chuck,meat,C206,Ground beef,exact
+ground cinnamon,spices_seasonings,C023,Spice (cooking state inapplicable),exact
+ground clove,spices_seasonings,C071,Ground spice,normalized_alias
+ground coriander,spices_seasonings,C071,Ground spice,exact
+ground cumin,spices_seasonings,C071,Ground spice,exact
+ground fennel seed,spices_seasonings,C071,Ground spice,normalized_alias
+ground flax seed,nuts_seeds,C046,Ground nuts or seeds,exact
+ground ginger,spices_seasonings,C071,Ground spice,exact
+ground lamb,meat,C357,"Ground lamb, mutton or goat meat",exact
+ground mace,spices_seasonings,C071,Ground spice,exact
+ground nutmeg,spices_seasonings,C071,Ground spice,exact
+ground pork,meat,C281,Ground pork,exact
+ground round,meat,C206,Ground beef,exact
+ground sirloin,meat,C206,Ground beef,exact
+ground turkey,poultry,C323,Ground poultry,exact
+ground turmeric,spices_seasonings,C071,Ground spice,exact
+ground veal,meat,C206,Ground beef,exact
+grouper fillet,seafood,C027,Fish,exact
+gruyere cheese,dairy,C002,Dairy cheese,exact
+guacamole,sauces_seasoning_liquids,C327,Pureed fruit sauce,exact
+guava,fruits,C062,Fruit,exact
+habanero pepper,vegetables,C021,Vegetables,exact
+half-and-half,dairy,C004,Dairy cream,exact
+halibut steak,seafood,C027,Fish,normalized_alias
+ham,meat,C077,Pork,exact
+ham bone,meat,C328,Pork stock bones,exact
+ham hock,meat,C077,Pork,exact
+ham spread,meat,C244,Pork spread,exact
+hard cider,beverages_juices,,,name_only
+hard-boiled egg,eggs,C214,Cooked whole egg,exact
+hash brown potato,vegetables,C072,Starchy roots and tubers,normalized_alias
+havarti cheese,dairy,C002,Dairy cheese,exact
+hazelnut,nuts_seeds,C042|C129,Cooked nuts or seeds or Nuts and seeds,normalized_alias
+heath candy bar,baking_flavoring_ingredients,C024,Confectionery,exact
+heavy cream,dairy,C004,Dairy cream,exact
+herb and garlic cream cheese,dairy,C002|C053|C360,Cheese spread or Cheese spread with vegetables and herbs or Dairy cheese,normalized_alias
+herbes de provence,spices_seasonings,C060,Herbs,exact
+herbs,spices_seasonings,C060,Herbs,exact
+hoisin sauce,sauces_seasoning_liquids,C015,Sauce or dressing,exact
+hollandaise sauce,sauces_seasoning_liquids,C015,Sauce or dressing,exact
+hominy,grains_starches,C007,Grain kernels,exact
+honey,sweeteners,C336,Sugar or sweetener (cooking state unspecified),exact
+honey bunches of oats cereal,grains_starches,C032,Grain cereal,exact
+honey mustard,sauces_seasoning_liquids,C015,Sauce or dressing,exact
+honey mustard dressing,sauces_seasoning_liquids,C015,Sauce or dressing,exact
+horseradish,spices_seasonings,C021,Vegetables,exact
+horseradish cream,sauces_seasoning_liquids,C015,Sauce or dressing,exact
+horseradish sauce,sauces_seasoning_liquids,C015,Sauce or dressing,exact
+hot chili oil,fats_oils,C044,Cooking oil,exact
+hot cocoa mix,baking_flavoring_ingredients,C168,Dry drink mix,exact
+hot dog,meat,C036,Formed meat product,exact
+hot dog bun,grains_starches,C011,Baked grain bread,exact
+hot italian sausage,meat,C036,Formed meat product,exact
+hot sauce,sauces_seasoning_liquids,C015,Sauce or dressing,exact
+hot spiced cider mix,beverages_juices,C168,Dry drink mix,exact
+hummus,legumes,C303,Pureed legume spread,exact
+ice,water_broth,C131,Water,exact
+ice cream,dairy,C149,Frozen dessert,exact
+ice cream cone,grains_starches,C083,Cooked grain product,normalized_alias
+iceberg lettuce,vegetables,C021,Vegetables,exact
+imitation crabmeat,seafood,C341,Formed seafood product,exact
+instant chocolate drink mix,beverages_juices,C168,Dry drink mix,exact
+instant coffee,beverages_juices,C127,Dried beverage ingredient,exact
+instant espresso powder,beverages_juices,C127,Dried beverage ingredient,exact
+instant potato flake,vegetables,C342|C399,Dried starchy roots or tubers or Starchy root puree,normalized_alias
+instant rice,grains_starches,C147,Cooked and dried grain kernels,exact
+instant yeast,leavening_agents,C262,Leavener (cooking state unspecified),exact
+irish cream liqueur,beverages_juices,C008,Alcoholic beverage,normalized_alias
+irish whiskey,beverages_juices,C008,Alcoholic beverage,exact
+italian bread,grains_starches,C011,Baked grain bread,exact
+italian cheese blend,dairy,C002,Dairy cheese,exact
+italian dressing,sauces_seasoning_liquids,C015,Sauce or dressing,exact
+italian dressing mix,sauces_seasoning_liquids,C030,Dry mix,exact
+italian pastina,grains_starches,C020,Grain noodles or pasta,exact
+italian sausage,meat,C036,Formed meat product,exact
+italian seasoned breadcrumb,grains_starches,C139,Crumbs from baked grain bread,normalized_alias
+italian seasoning,spices_seasonings,C060,Herbs,exact
+italian-style diced tomato,vegetables,C021,Vegetables,normalized_alias
+italian-style tomato sauce,sauces_seasoning_liquids,C015,Sauce or dressing,exact
+jalapeno pepper,vegetables,C021,Vegetables,exact
+jalapeno sauce,sauces_seasoning_liquids,C015,Sauce or dressing,exact
+japanese eggplant,vegetables,C021,Vegetables,exact
+jasmine rice,grains_starches,C007,Grain kernels,exact
+jumbo pasta shell,grains_starches,C020,Grain noodles or pasta,normalized_alias
+juniper berry,fruits,C023,Spice (cooking state inapplicable),normalized_alias
+kahlua coffee liqueur,beverages_juices,C008,Alcoholic beverage,normalized_alias
+kalamata olive,vegetables,C123,Pickled fruit,exact
+kale,vegetables,C021,Vegetables,exact
+kelp,seafood,C070,Seaweed,exact
+ketchup,sauces_seasoning_liquids,C015,Sauce or dressing,exact
+key lime juice,beverages_juices,C047,Juice,exact
+key lime pie yogurt,dairy,C093,Cultured dairy yogurt,exact
+kidney bean,legumes,C010,Legumes,exact
+kielbasa,meat,C036,Formed meat product,exact
+kiwi fruit,fruits,C062,Fruit,exact
+kosher salt,spices_seasonings,C126,Salt,exact
+kosher salt & freshly ground black pepper,,C353,Spiced salt,exact
+kudzu,grains_starches,C350,Isolated root starch,exact
+ladyfinger,grains_starches,C039,Baked grain cookie,exact
+lamb,meat,C132,"Lamb, mutton or goat meat",exact
+lamb loin chop,meat,C132,"Lamb, mutton or goat meat",exact
+lamb shank,meat,C132,"Lamb, mutton or goat meat",exact
+lamb shoulder,meat,C132,"Lamb, mutton or goat meat",exact
+lamb steak,meat,C132,"Lamb, mutton or goat meat",exact
+lard,fats_oils,C081,Solid cooking fat,exact
+lasagna noodle,grains_starches,C020,Grain noodles or pasta,exact
+laughing cow cheese,dairy,C002,Dairy cheese,exact
+lavender,spices_seasonings,C060,Herbs,exact
+leek,vegetables,C021,Vegetables,exact
+leg of lamb,meat,C132,"Lamb, mutton or goat meat",exact
+lemon,fruits,C062,Fruit,exact
+lemon cake mix,grains_starches,C058,Grain-based dry mix,exact
+lemon curd,baking_flavoring_ingredients,C064,Fruit spread or filling,exact
+lemon extract,baking_flavoring_ingredients,C040,Flavoring or extract,exact
+lemon juice,beverages_juices,C047,Juice,exact
+lemon pepper seasoning,spices_seasonings,C023,Spice (cooking state inapplicable),exact
+lemon thyme,spices_seasonings,C060,Herbs,exact
+lemon zest,fruits,C062,Fruit,exact
+"lemon, juice and zest of",,C359,Fruit with its juice,exact
+lemon-lime soda,beverages_juices,C012,Beverage,normalized_alias
+lemonade,beverages_juices,C012,Beverage,exact
+lemonade concentrate,beverages_juices,C153,Beverage concentrate,exact
+lentil,legumes,C010,Legumes,normalized_alias
+lettuce,vegetables,C021,Vegetables,exact
+light corn syrup,sweeteners,C026,Sugar or sweetener (cooking state inapplicable),exact
+light cream,dairy,C004,Dairy cream,exact
+light soy sauce,sauces_seasoning_liquids,C242,Fermented sauce,exact
+lima bean,legumes,C010,Legumes,normalized_alias
+lime,fruits,C062,Fruit,exact
+lime juice,beverages_juices,C047,Juice,exact
+lime zest,fruits,C062,Fruit,exact
+"lime, juice and zest of",,C359,Fruit with its juice,exact
+"limes, juice and zest of",,C359,Fruit with its juice,exact
+linguine,grains_starches,C020,Grain noodles or pasta,exact
+liquid,,,,name_only
+liquid aminos,sauces_seasoning_liquids,C015,Sauce or dressing,normalized_alias
+liquid smoke,sauces_seasoning_liquids,C040,Flavoring or extract,exact
+long bean,legumes,C021,Vegetables,normalized_alias
+long-grain white rice,grains_starches,C007,Grain kernels,exact
+low-carb tortilla,grains_starches,C309,Baked bread (base unspecified),exact
+lychee juice,beverages_juices,C047,Juice,exact
+m&m's,baking_flavoring_ingredients,C024,Confectionery,exact
+macaroni and cheese dinner,grains_starches,C172,Grain pasta with cheese,normalized_alias
+madeira wine,beverages_juices,C008,Alcoholic beverage,exact
+mahi mahi fillet,seafood,C027,Fish,exact
+malt vinegar,sauces_seasoning_liquids,C017,Fermented vinegar,exact
+malted milk ball,baking_flavoring_ingredients,C024,Confectionery,normalized_alias
+manchego cheese,dairy,C002,Dairy cheese,exact
+mandarin juice,beverages_juices,C047,Juice,exact
+mandarin orange,fruits,C062,Fruit,exact
+mango,fruits,C062,Fruit,exact
+mango chutney,sauces_seasoning_liquids,C076,Fruit sauce,exact
+mango nectar,beverages_juices,C047,Juice,exact
+maple syrup,sweeteners,C026,Sugar or sweetener (cooking state inapplicable),exact
+maraschino cherry,fruits,C062,Fruit,exact
+maraschino cherry juice,beverages_juices,C047,Juice,exact
+marble loaf cake,grains_starches,,,name_only
+margarine,fats_oils,C106,Solid butter or butter substitute,exact
+marinade,sauces_seasoning_liquids,C015,Sauce or dressing,exact
+marinara sauce,sauces_seasoning_liquids,C015,Sauce or dressing,exact
+marinated artichoke heart,vegetables,C021,Vegetables,normalized_alias
+marjoram,spices_seasonings,C060,Herbs,exact
+marsala wine,beverages_juices,C008,Alcoholic beverage,exact
+marshmallow,baking_flavoring_ingredients,C024,Confectionery,normalized_alias
+marshmallow creme,baking_flavoring_ingredients,C367,Confectionery spread,exact
+masa harina,grains_starches,C034,Milled grain flour,exact
+mascarpone cheese,dairy,C002,Dairy cheese,exact
+mashed banana,fruits,C067,Fruit puree,exact
+mashed potato,vegetables,C305,Cooked starchy root puree,normalized_alias
+matzo meal,grains_starches,C289,Heat-treated ground grain,exact
+mayonnaise,sauces_seasoning_liquids,C015,Sauce or dressing,exact
+mcintosh apple,fruits,C062,Fruit,exact
+meat extract paste,meat,,,name_only
+meat tenderizer,spices_seasonings,C019,Food additive (cooking state unspecified),exact
+meatball,meat,C036,Formed meat product,normalized_alias
+meatless crumbles,legumes,C082|C374,Formed meat or meat substitute (base unspecified) or Legume-based formed meat substitute,normalized_alias
+melon liqueur,beverages_juices,C008,Alcoholic beverage,exact
+mesquite powder,spices_seasonings,C165,Ground legumes,exact
+mexican cheese blend,dairy,C002,Dairy cheese,normalized_alias
+mexican chocolate,baking_flavoring_ingredients,C024,Confectionery,exact
+mexican seasoning,spices_seasonings,C023,Spice (cooking state inapplicable),exact
+milk,dairy,C001,Milk,exact
+milk chocolate,baking_flavoring_ingredients,C024,Confectionery,exact
+milk chocolate bar,baking_flavoring_ingredients,C024,Confectionery,normalized_alias
+milk chocolate candy bar with almond,baking_flavoring_ingredients,C154,Nut or seed confectionery,normalized_alias
+milk chocolate chip,baking_flavoring_ingredients,C024,Confectionery,normalized_alias
+milk chocolate-covered pretzel,grains_starches,,,name_only
+milky way bar,baking_flavoring_ingredients,C024,Confectionery,exact
+mincemeat,fruits,C183,Spread or filling,exact
+mini chocolate chip,baking_flavoring_ingredients,C024,Confectionery,exact
+miniature phyllo cup,grains_starches,C005,Grain-based pie or tart shell,normalized_alias
+mint,spices_seasonings,C060,Herbs,exact
+mint chocolate chip ice cream,dairy,C149,Frozen dessert,exact
+miracle whip,sauces_seasoning_liquids,C015,Sauce or dressing,exact
+mirin,sauces_seasoning_liquids,C008,Alcoholic beverage,exact
+miso,legumes,C239,Fermented legume seasoning paste,exact
+mixed dried fruit,fruits,C087,Dried fruit,exact
+mixed herbs,spices_seasonings,C060,Herbs,exact
+mixed spice,spices_seasonings,C023,Spice (cooking state inapplicable),exact
+mixed sprout,vegetables,C021,Vegetables,normalized_alias
+mixed vegetables,vegetables,C021,Vegetables,exact
+molasses,sweeteners,C026,Sugar or sweetener (cooking state inapplicable),exact
+monterey jack cheese,dairy,C002,Dairy cheese,exact
+mortadella,meat,C234,Formed pork product,exact
+mozzarella cheddar blend cheese,dairy,C002,Dairy cheese,exact
+mozzarella cheese,dairy,C002,Dairy cheese,exact
+mozzarella string cheese,dairy,C002,Dairy cheese,exact
+msg,spices_seasonings,C016,Food additive (cooking state inapplicable),exact
+muenster cheese,dairy,C002,Dairy cheese,exact
+mung bean,legumes,C010,Legumes,normalized_alias
+muscovado sugar,sweeteners,C026,Sugar or sweetener (cooking state inapplicable),exact
+mushroom,vegetables,C124,Mushrooms,exact
+mushroom broth,water_broth,C102,Broth or stock,exact
+mushroom soy sauce,sauces_seasoning_liquids,C242,Fermented sauce,exact
+mussel,seafood,C078,Mollusks,normalized_alias
+mustard powder,spices_seasonings,C071,Ground spice,exact
+mustard seed,spices_seasonings,C023,Spice (cooking state inapplicable),normalized_alias
+napa cabbage,vegetables,C021,Vegetables,exact
+natural bran,grains_starches,C009,Grain products,exact
+navy bean,legumes,C010,Legumes,normalized_alias
+nectarine,fruits,C062,Fruit,exact
+no-boil lasagna noodle,grains_starches,C020,Grain noodles or pasta,normalized_alias
+non-dairy powdered coffee creamer,dairy,C293,Dried creamer powder,exact
+noodle,grains_starches,C073,Noodles or pasta (base unspecified),normalized_alias
+nut,nuts_seeds,C042|C046,Ground nuts or seeds or Nuts and seeds,normalized_alias
+nut butter,nuts_seeds,C038,Pureed nut or seed spread,exact
+nutella,nuts_seeds,C196,Nut or seed confectionery spread,exact
+nutritional yeast,spices_seasonings,,,name_only
+oat bran,grains_starches,C009,Grain products,exact
+oil-packed sun-dried tomato,vegetables,C055,Dried vegetables,normalized_alias
+okra,vegetables,C021,Vegetables,exact
+old bay seasoning,spices_seasonings,C023,Spice (cooking state inapplicable),exact
+olive,vegetables,C062,Fruit,exact
+olive oil,fats_oils,C044,Cooking oil,exact
+olive salad,vegetables,C062,Fruit,exact
+onion,vegetables,C021,Vegetables,exact
+onion powder,spices_seasonings,C167,Dried vegetable powder,exact
+onion roll,grains_starches,C011,Baked grain bread,exact
+onion salt,spices_seasonings,C126,Salt,exact
+orange,fruits,C062,Fruit,exact
+orange bell pepper,vegetables,C021,Vegetables,exact
+orange blossom water,baking_flavoring_ingredients,C040,Flavoring or extract,exact
+orange drink,beverages_juices,,,name_only
+orange extract,baking_flavoring_ingredients,C040,Flavoring or extract,exact
+orange juice,beverages_juices,C047,Juice,exact
+orange juice concentrate,beverages_juices,C065,Juice concentrate,exact
+orange liqueur,beverages_juices,C008,Alcoholic beverage,exact
+orange zest,fruits,C062,Fruit,exact
+"orange, juice and zest of",,C359,Fruit with its juice,exact
+orange-infused vodka,beverages_juices,C008,Alcoholic beverage,exact
+"oranges, juice and zest of",,C359,Fruit with its juice,exact
+oregano,spices_seasonings,C060,Herbs,exact
+orzo pasta,grains_starches,C020,Grain noodles or pasta,exact
+ox tongue,meat,C112,Beef offal,exact
+oyster,seafood,C078,Mollusks,exact
+oyster cracker,grains_starches,C105,Baked grain crackers,normalized_alias
+oyster sauce,sauces_seasoning_liquids,C015,Sauce or dressing,exact
+pancake mix,grains_starches,C058,Grain-based dry mix,exact
+pancetta,meat,C077,Pork,exact
+panko breadcrumb,grains_starches,C139,Crumbs from baked grain bread,normalized_alias
+papaya,fruits,C062,Fruit,exact
+paper baking cups,,C049,Nonfood kitchen supplies,exact
+paprika,spices_seasonings,C023,Spice (cooking state inapplicable),exact
+parboiled rice,grains_starches,C222,Dried grain kernels,exact
+parmesan cheese,dairy,C002,Dairy cheese,exact
+parsley,spices_seasonings,C060,Herbs,exact
+parsnip,vegetables,C021,Vegetables,exact
+pasta,grains_starches,C073,Noodles or pasta (base unspecified),exact
+pasta sauce,sauces_seasoning_liquids,C015,Sauce or dressing,exact
+pasta shell,grains_starches,C020,Grain noodles or pasta,normalized_alias
+pea,legumes,C010|C084,Cooked legumes or Legumes,normalized_alias
+peach,fruits,C062,Fruit,exact
+peach chutney,sauces_seasoning_liquids,C076,Fruit sauce,exact
+peach juice,beverages_juices,C047,Juice,exact
+peach nectar,beverages_juices,C047,Juice,exact
+peach schnapps,beverages_juices,C008,Alcoholic beverage,exact
+peanut,nuts_seeds,C267|C389,Cooked legumes used as nuts or Legumes used as nuts,normalized_alias
+peanut butter,nuts_seeds,C117,Spread from legumes used as nuts,exact
+peanut butter and milk chocolate chip,baking_flavoring_ingredients,C024,Confectionery,normalized_alias
+peanut butter chip,nuts_seeds,C024,Confectionery,normalized_alias
+peanut butter cookie mix,grains_starches,C058,Grain-based dry mix,exact
+peanut oil,fats_oils,C044,Cooking oil,exact
+pear,fruits,C062,Fruit,exact
+pearl onion,vegetables,C021,Vegetables,normalized_alias
+pecan,nuts_seeds,C042,Nuts and seeds,normalized_alias
+pecorino romano cheese,dairy,C002,Dairy cheese,exact
+penne pasta,grains_starches,C020,Grain noodles or pasta,exact
+pepper berry,vegetables,,,name_only
+pepper jack cheese,dairy,C002,Dairy cheese,normalized_alias
+peppermint candy,baking_flavoring_ingredients,C024,Confectionery,exact
+peppermint extract,baking_flavoring_ingredients,C040,Flavoring or extract,exact
+peppermint patty,baking_flavoring_ingredients,C024,Confectionery,normalized_alias
+pepperoncini pepper,vegetables,C021,Vegetables,exact
+pepperoni,meat,C036,Formed meat product,exact
+pesto sauce,sauces_seasoning_liquids,C015,Sauce or dressing,exact
+pesto sauce mix,sauces_seasoning_liquids,C030,Dry mix,exact
+pheasant,poultry,C079,Poultry,exact
+phyllo dough,grains_starches,C248,Unbaked grain pastry dough,exact
+picante sauce,sauces_seasoning_liquids,C015,Sauce or dressing,exact
+pickapeppa sauce,sauces_seasoning_liquids,C015,Sauce or dressing,exact
+pickle juice,vegetables,C136,Brine,exact
+pickled ginger,spices_seasonings,C391,Pickled spice (cooking state unspecified),exact
+pickled jalapeno pepper,vegetables,C137,Pickled vegetables,exact
+pickling cucumber,vegetables,C021,Vegetables,exact
+pickling salt,spices_seasonings,C126,Salt,exact
+pie crust,grains_starches,C005,Grain-based pie or tart shell,exact
+pimiento,vegetables,C021,Vegetables,exact
+pimiento-stuffed olive,vegetables,C123|C445,Pickled fruit or Pickled fruit and vegetables,normalized_alias
+pine nut,nuts_seeds,C042,Nuts and seeds,normalized_alias
+pineapple,fruits,C062,Fruit,exact
+pineapple juice,beverages_juices,C047,Juice,exact
+pineapple salsa,sauces_seasoning_liquids,C076,Fruit sauce,exact
+pineapple soda,beverages_juices,,,name_only
+pineapple-orange-banana juice,beverages_juices,C047,Juice,exact
+pink lemonade,beverages_juices,C012,Beverage,exact
+pinto bean,legumes,C010,Legumes,normalized_alias
+pistachio,nuts_seeds,C042,Nuts and seeds,normalized_alias
+pita bread,grains_starches,C011,Baked grain bread,exact
+pizza dough,grains_starches,C097,Unbaked grain bread dough,exact
+pizza sauce,sauces_seasoning_liquids,C015,Sauce or dressing,exact
+plain yogurt,dairy,C093,Cultured dairy yogurt,exact
+plantain,fruits,C062,Fruit,exact
+plastic wrap,,C049,Nonfood kitchen supplies,exact
+plum,fruits,C062,Fruit,exact
+poblano pepper,vegetables,C021,Vegetables,exact
+polenta,grains_starches,C009,Grain products,exact
+pomegranate juice,beverages_juices,C047,Juice,exact
+pomegranate seed,fruits,C062,Fruit,normalized_alias
+popcorn,grains_starches,C007,Grain kernels,exact
+popcorn chicken,poultry,C141,Breaded poultry,exact
+poppy seed,spices_seasonings,C042,Nuts and seeds,exact
+poppy seed dressing,sauces_seasoning_liquids,C395,Nut or seed sauce,exact
+pork,meat,C077,Pork,exact
+pork and beans,composite_processed_foods,C396,Pork and legume mixture,exact
+pork chop,meat,C077,Pork,exact
+pork loin,meat,C077,Pork,exact
+pork loin roast,meat,C077,Pork,exact
+pork roast,meat,C077,Pork,exact
+pork sausage,meat,C234,Formed pork product,exact
+pork shoulder,meat,C077,Pork,exact
+pork steak,meat,C077,Pork,exact
+pork tenderloin,meat,C077,Pork,exact
+port wine,beverages_juices,C008,Alcoholic beverage,exact
+portabella mushroom,vegetables,C124,Mushrooms,exact
+porterhouse steak,meat,C061,Beef,exact
+pot roast,meat,C061,Beef,exact
+potato,vegetables,C072,Starchy roots and tubers,exact
+potato and cheese pierogi,grains_starches,C398,Grain pasta with cheese and starchy roots,normalized_alias
+potato chip,grains_starches,C085,Cooked starchy roots or tubers,normalized_alias
+potato flour,grains_starches,C400,Starchy root flour,exact
+potato starch,grains_starches,C350,Isolated root starch,exact
+poultry seasoning,spices_seasonings,C023,Spice (cooking state inapplicable),exact
+powdered milk,dairy,C088,Powdered milk,exact
+powdered sugar,sweeteners,C340,Powdered sweetener,exact
+praline powder,baking_flavoring_ingredients,,,name_only
+prepared horseradish,spices_seasonings,C021,Vegetables,exact
+prepared pizza crust,grains_starches,C138,Grain bread (cooking state unspecified),exact
+pretzel,grains_starches,C105,Baked grain crackers,exact
+pretzel crumb,grains_starches,C105,Baked grain crackers,normalized_alias
+pretzel nugget,grains_starches,C105,Baked grain crackers,normalized_alias
+processed cheese,dairy,C002,Dairy cheese,exact
+prosciutto,meat,C382,Dried pork,exact
+provolone cheese,dairy,C002,Dairy cheese,exact
+prune,fruits,C087,Dried fruit,exact
+prune puree,fruits,C067,Fruit puree,exact
+puff pastry,grains_starches,C248,Unbaked grain pastry dough,exact
+puff pastry shell,grains_starches,C005,Grain-based pie or tart shell,normalized_alias
+puffed rice cereal,grains_starches,C032,Grain cereal,exact
+pumpernickel bread,grains_starches,C011,Baked grain bread,exact
+pumpkin,vegetables,C021,Vegetables,exact
+pumpkin pie spice,spices_seasonings,C023,Spice (cooking state inapplicable),exact
+pumpkin puree,vegetables,C166,Vegetable puree,exact
+pumpkin seed,nuts_seeds,C042,Nuts and seeds,normalized_alias
+queso fresco,dairy,C002,Dairy cheese,exact
+quick oats,grains_starches,C007,Grain kernels,exact
+quinoa,grains_starches,C007,Grain kernels,exact
+rabbit,meat,C035,Meat,exact
+radish,vegetables,C021,Vegetables,exact
+raisin,fruits,C087,Dried fruit,normalized_alias
+raisin bran cereal,grains_starches,C032,Grain cereal,exact
+ramen noodle,grains_starches,C020,Grain noodles or pasta,normalized_alias
+ranch dressing,sauces_seasoning_liquids,C015,Sauce or dressing,exact
+ranch dressing mix,sauces_seasoning_liquids,C030,Dry mix,exact
+ranch style bean,legumes,C010,Legumes,exact
+ranchera sauce,sauces_seasoning_liquids,,,name_only
+raspberry,fruits,C062,Fruit,normalized_alias
+raspberry flavored syrup,sweeteners,C026,Sugar or sweetener (cooking state inapplicable),exact
+raspberry lemonade concentrate,beverages_juices,C153,Beverage concentrate,normalized_alias
+raspberry puree,fruits,C067,Fruit puree,exact
+raspberry spreadable fruit,fruits,C064,Fruit spread or filling,exact
+raspberry vinegar,sauces_seasoning_liquids,C017,Fermented vinegar,exact
+red bean paste,legumes,C414,Legume puree,exact
+red bell pepper,vegetables,C021,Vegetables,exact
+red cabbage,vegetables,C021,Vegetables,exact
+red caviar,seafood,C122,Seafood,exact
+red chili pepper,vegetables,C021,Vegetables,exact
+red lentil,legumes,C010,Legumes,exact
+red onion,vegetables,C021,Vegetables,exact
+red pepper flake,spices_seasonings,C184,Dried spice,normalized_alias
+red potato,vegetables,C072,Starchy roots and tubers,normalized_alias
+red snapper fillet,seafood,C027,Fish,exact
+red wine,beverages_juices,C029,Fermented alcoholic beverage,exact
+red wine vinegar,sauces_seasoning_liquids,C017,Fermented vinegar,exact
+red-hot candy,baking_flavoring_ingredients,C024,Confectionery,normalized_alias
+reese's peanut butter cup,baking_flavoring_ingredients,C024,Confectionery,normalized_alias
+refried bean,legumes,C416,Cooked legume puree,normalized_alias
+refrigerated biscuit dough,grains_starches,C097,Unbaked grain bread dough,normalized_alias
+refrigerated chocolate chip cookie dough,grains_starches,C229,Unbaked grain cookie dough,exact
+refrigerated sugar cookie dough,grains_starches,C229,Unbaked grain cookie dough,exact
+rhubarb,fruits,C021,Vegetables,exact
+rib eye steak,meat,C061,Beef,exact
+rice,grains_starches,C007,Grain kernels,exact
+rice milk,beverages_juices,C381,Grain milk,exact
+rice noodle,grains_starches,C020,Grain noodles or pasta,normalized_alias
+rice paper sheet,grains_starches,C009,Grain products,exact
+rice pilaf mix,grains_starches,C144,Dry grain kernel mix,exact
+rice vermicelli,grains_starches,C020,Grain noodles or pasta,exact
+rice vinegar,sauces_seasoning_liquids,C017,Fermented vinegar,exact
+rice wine,beverages_juices,C029,Fermented alcoholic beverage,exact
+ricotta cheese,dairy,C002,Dairy cheese,exact
+rigatoni pasta,grains_starches,C020,Grain noodles or pasta,exact
+roast beef,meat,C094,Cooked beef,exact
+roasted garlic,vegetables,C156,Cooked vegetables,exact
+roasted red pepper,vegetables,C156,Cooked vegetables,exact
+roll,grains_starches,C011,Baked grain bread,exact
+rolled oats,grains_starches,C007,Grain kernels,exact
+roma tomato,vegetables,C021,Vegetables,exact
+romaine lettuce,vegetables,C021,Vegetables,exact
+roquefort cheese,dairy,C002,Dairy cheese,exact
+rose water,baking_flavoring_ingredients,C040,Flavoring or extract,exact
+rosemary,spices_seasonings,C060,Herbs,exact
+rotini pasta,grains_starches,C020,Grain noodles or pasta,exact
+round steak,meat,C061,Beef,exact
+rum,beverages_juices,C008,Alcoholic beverage,exact
+rum extract,baking_flavoring_ingredients,C040,Flavoring or extract,exact
+rump roast,meat,C061,Beef,exact
+rump steak,meat,C061,Beef,exact
+russet potato,vegetables,C072,Starchy roots and tubers,exact
+russian salad dressing,sauces_seasoning_liquids,C015,Sauce or dressing,exact
+rye bread,grains_starches,C011,Baked grain bread,exact
+rye breadcrumb,grains_starches,C139,Crumbs from baked grain bread,normalized_alias
+safflower oil,fats_oils,C044,Cooking oil,exact
+saffron,spices_seasonings,C023,Spice (cooking state inapplicable),exact
+sage,spices_seasonings,C060,Herbs,exact
+sake,beverages_juices,C029,Fermented alcoholic beverage,exact
+salad dressing mix,sauces_seasoning_liquids,C030,Dry mix,exact
+salad greens,vegetables,C021,Vegetables,exact
+salami,meat,C036,Formed meat product,exact
+salmon fillet,seafood,C027,Fish,exact
+salmon steak,seafood,C027,Fish,exact
+salsa,sauces_seasoning_liquids,C015,Sauce or dressing,exact
+salsa verde,sauces_seasoning_liquids,C015,Sauce or dressing,exact
+salt,spices_seasonings,C126,Salt,exact
+salt & fresh ground pepper,,C353,Spiced salt,exact
+salt & freshly ground black pepper,,C353,Spiced salt,exact
+salt & pepper,,C353,Spiced salt,exact
+salt and black pepper,,C353,Spiced salt,exact
+salt and pepper,,C353,Spiced salt,exact
+salt water,,C136,Brine,exact
+salt-free herb seasoning,spices_seasonings,C023,Spice (cooking state inapplicable),normalized_alias
+saltine cracker,grains_starches,C105,Baked grain crackers,normalized_alias
+saltine crumb,grains_starches,C105,Baked grain crackers,normalized_alias
+sambal oelek,sauces_seasoning_liquids,C018,Seasoning paste,exact
+sandwich bread,grains_starches,C011,Baked grain bread,exact
+sandwich steak,meat,C061,Beef,exact
+sardine,seafood,C027,Fish,normalized_alias
+sauerkraut,vegetables,C151,Fermented pickled vegetables,exact
+sausage,meat,C036,Formed meat product,exact
+savoy cabbage,vegetables,C021,Vegetables,exact
+scallop,seafood,C078,Mollusks,normalized_alias
+sea bass fillet,seafood,C027,Fish,exact
+sea salt,spices_seasonings,C126,Salt,exact
+seafood seasoning,spices_seasonings,C023,Spice (cooking state inapplicable),exact
+seasoned rice vinegar,sauces_seasoning_liquids,C017,Fermented vinegar,exact
+seasoned salt,spices_seasonings,C126,Salt,normalized_alias
+seasoning,spices_seasonings,C023,Spice (cooking state inapplicable),exact
+seedless watermelon,fruits,C062,Fruit,exact
+seitan,grains_starches,C009,Grain products,exact
+self-rising flour,grains_starches,C424,Self-raising grain flour,exact
+semisweet chocolate,baking_flavoring_ingredients,C024,Confectionery,exact
+semisweet chocolate chip,baking_flavoring_ingredients,C024,Confectionery,normalized_alias
+serrano pepper,vegetables,C021,Vegetables,exact
+sesame oil,fats_oils,C044,Cooking oil,exact
+sesame seed,nuts_seeds,C042|C129,Cooked nuts or seeds or Nuts and seeds,normalized_alias
+shallot,vegetables,C021,Vegetables,exact
+sharp cheddar cheese,dairy,C002,Dairy cheese,exact
+sherry wine vinegar,sauces_seasoning_liquids,C017,Fermented vinegar,exact
+shiitake mushroom,vegetables,C124,Mushrooms,exact
+shirataki noodle,grains_starches,C073,Noodles or pasta (base unspecified),normalized_alias
+shortening,fats_oils,C081,Solid cooking fat,exact
+shredded wheat cereal,grains_starches,C032,Grain cereal,exact
+shrimp,seafood,C080,Crustaceans,exact
+silken tofu,legumes,C152,Tofu,exact
+simple syrup,sweeteners,C026,Sugar or sweetener (cooking state inapplicable),exact
+sirloin steak,meat,C061,Beef,exact
+skirt steak,meat,C061,Beef,exact
+small pretzel,grains_starches,C105,Baked grain crackers,normalized_alias
+smoked beef,meat,C386,Smoked beef,exact
+smoked cheddar cheese,dairy,C002,Dairy cheese,exact
+smoked chicken,poultry,C431,Smoked poultry,exact
+smoked gouda cheese,dairy,C002,Dairy cheese,exact
+smoked paprika,spices_seasonings,C339,Smoked spice,exact
+smoked salmon,seafood,C290,Smoked fish,exact
+smoked sausage,meat,C036,Formed meat product,exact
+smoked turkey breast,poultry,C431,Smoked poultry,exact
+snow pea,legumes,C021,Vegetables,normalized_alias
+soba noodle,grains_starches,C020,Grain noodles or pasta,normalized_alias
+sofrito sauce,sauces_seasoning_liquids,C015,Sauce or dressing,exact
+sole fillet,seafood,C027,Fish,exact
+sour cream,dairy,C143,Cultured dairy cream,exact
+sour orange juice,beverages_juices,C047,Juice,exact
+sourdough bread,grains_starches,C421,Baked fermented grain bread,exact
+sourdough bread cube,grains_starches,,,name_only
+sourdough starter,grains_starches,C022,Fermentation starter or leavener,exact
+southwest seasoning,spices_seasonings,C023,Spice (cooking state inapplicable),exact
+soy cheddar cheese,dairy,C392,Cheese-style product (base unspecified),exact
+soy ham,legumes,,,name_only
+soy sauce,sauces_seasoning_liquids,C242,Fermented sauce,exact
+soybean,legumes,C010,Legumes,normalized_alias
+soymilk,beverages_juices,C199,Legume milk,exact
+spaghetti,grains_starches,C020,Grain noodles or pasta,exact
+spaghetti sauce mix,sauces_seasoning_liquids,C030,Dry mix,exact
+spaghetti squash,vegetables,C021,Vegetables,exact
+spam,meat,C444,Cooked formed pork,exact
+spanish rice mix,grains_starches,C144,Dry grain kernel mix,exact
+sparkling water,water_broth,C131,Water,exact
+special k cereal,grains_starches,C032,Grain cereal,exact
+spice cake mix,grains_starches,C058,Grain-based dry mix,exact
+spiced rum,beverages_juices,C008,Alcoholic beverage,exact
+spicy brown mustard,sauces_seasoning_liquids,C015,Sauce or dressing,exact
+spicy sausage,meat,C036,Formed meat product,exact
+spinach,vegetables,C021,Vegetables,exact
+spinach linguine,grains_starches,C020,Grain noodles or pasta,exact
+spinach penne,grains_starches,C020,Grain noodles or pasta,exact
+spinach souffle,vegetables,C156,Cooked vegetables,exact
+split pea,legumes,C010,Legumes,normalized_alias
+sprinkles,baking_flavoring_ingredients,C024,Confectionery,normalized_alias
+squash,vegetables,C021,Vegetables,exact
+squash puree,vegetables,C166,Vegetable puree,exact
+star anise,spices_seasonings,C023,Spice (cooking state inapplicable),exact
+steak,meat,C061,Beef,exact
+steak sauce,sauces_seasoning_liquids,C015,Sauce or dressing,exact
+steak seasoning,spices_seasonings,C023,Spice (cooking state inapplicable),exact
+stewed tomato,vegetables,C156,Cooked vegetables,normalized_alias
+stewing beef,meat,C061,Beef,exact
+stir-fry sauce,sauces_seasoning_liquids,C015,Sauce or dressing,exact
+strawberry,fruits,C062,Fruit,exact
+strawberry ice cream,dairy,C149,Frozen dessert,exact
+strawberry milk mix,beverages_juices,C168,Dry drink mix,exact
+strawberry puree,fruits,C067,Fruit puree,exact
+strawberry yogurt,dairy,C093,Cultured dairy yogurt,exact
+strip steak,meat,C061,Beef,exact
+suet,fats_oils,C081,Solid cooking fat,exact
+sugar,sweeteners,C026,Sugar or sweetener (cooking state inapplicable),exact
+sugar snap pea,legumes,C021,Vegetables,exact
+sugar substitute,sweeteners,C026,Sugar or sweetener (cooking state inapplicable),exact
+sultana,fruits,C087,Dried fruit,exact
+sun-dried tomato,vegetables,C055,Dried vegetables,exact
+sun-dried tomato vinaigrette dressing,sauces_seasoning_liquids,C015,Sauce or dressing,exact
+sunflower oil,fats_oils,C044,Cooking oil,exact
+sunflower seed,nuts_seeds,C042,Nuts and seeds,normalized_alias
+sweet and sour mix,beverages_juices,C012,Beverage,normalized_alias
+sweet and sour sauce,sauces_seasoning_liquids,C015,Sauce or dressing,exact
+sweet and sour soda,beverages_juices,C012,Beverage,exact
+sweet baking chocolate,baking_flavoring_ingredients,C024,Confectionery,exact
+sweet bread,grains_starches,C011,Baked grain bread,exact
+sweet chili sauce,sauces_seasoning_liquids,C015,Sauce or dressing,exact
+sweet italian sausage,meat,C036,Formed meat product,exact
+sweet onion,vegetables,C021,Vegetables,exact
+sweet paprika,spices_seasonings,C023,Spice (cooking state inapplicable),exact
+sweet pickle,vegetables,C137,Pickled vegetables,exact
+sweet pickle juice,vegetables,C136,Brine,exact
+sweet potato,vegetables,C072,Starchy roots and tubers,exact
+sweet red wine,beverages_juices,C029,Fermented alcoholic beverage,exact
+sweet relish,sauces_seasoning_liquids,C015,Sauce or dressing,exact
+sweet sherry,beverages_juices,C008,Alcoholic beverage,exact
+sweet soy sauce,sauces_seasoning_liquids,C242,Fermented sauce,exact
+sweet vermouth,beverages_juices,C008,Alcoholic beverage,exact
+sweetened condensed milk,dairy,C220,Concentrated milk,exact
+sweetened lemonade drink mix,beverages_juices,C168,Dry drink mix,exact
+sweetened strawberry,fruits,C062,Fruit,normalized_alias
+swiss cheese,dairy,C002,Dairy cheese,exact
+swordfish steak,seafood,C027,Fish,exact
+syrup,sweeteners,C026,Sugar or sweetener (cooking state inapplicable),exact
+tabasco sauce,sauces_seasoning_liquids,C015,Sauce or dressing,exact
+taco sauce,sauces_seasoning_liquids,C015,Sauce or dressing,exact
+taco seasoning,spices_seasonings,C023,Spice (cooking state inapplicable),exact
+taco shell,grains_starches,C083,Cooked grain product,exact
+tahini,sauces_seasoning_liquids,C190,Nut or seed seasoning paste,exact
+tamarind juice,beverages_juices,C047,Juice,exact
+tamarind paste,fruits,C125,Fruit seasoning paste,exact
+tapioca,grains_starches,C350,Isolated root starch,exact
+tarragon,spices_seasonings,C060,Herbs,exact
+tarragon white wine vinegar,sauces_seasoning_liquids,C017,Fermented vinegar,exact
+tart shell,grains_starches,C005,Grain-based pie or tart shell,exact
+tater tot,vegetables,C085,Cooked starchy roots or tubers,normalized_alias
+tequila,beverages_juices,C008,Alcoholic beverage,exact
+teriyaki sauce,sauces_seasoning_liquids,C015,Sauce or dressing,exact
+thai basil,spices_seasonings,C060,Herbs,exact
+thai chili pepper,vegetables,C021,Vegetables,normalized_alias
+thai red curry paste,sauces_seasoning_liquids,C018,Seasoning paste,exact
+thin pizza crust,grains_starches,C138,Grain bread (cooking state unspecified),exact
+thyme,spices_seasonings,C060,Herbs,exact
+tilapia fillet,seafood,C027,Fish,exact
+toasted corn cereal,grains_starches,C171,Heat-treated grain cereal,exact
+toasted oat cereal,grains_starches,C171,Heat-treated grain cereal,exact
+toasted sesame oil,fats_oils,C044,Cooking oil,exact
+toblerone chocolate bar,baking_flavoring_ingredients,C024,Confectionery,exact
+toffee piece,baking_flavoring_ingredients,C024,Confectionery,normalized_alias
+tofu,legumes,C152,Tofu,exact
+tomatillo,fruits,C021,Vegetables,exact
+tomato,vegetables,C021,Vegetables,normalized_alias
+tomato juice,beverages_juices,C047,Juice,exact
+tomato paste,vegetables,C215,Concentrated vegetable puree,exact
+tomato puree,vegetables,C166,Vegetable puree,exact
+tomato sauce,sauces_seasoning_liquids,C015,Sauce or dressing,exact
+tonkatsu sauce,sauces_seasoning_liquids,C015,Sauce or dressing,exact
+toor dal,legumes,C010,Legumes,exact
+top round steak,meat,C061,Beef,exact
+top sirloin steak,meat,C061,Beef,exact
+tortilla,grains_starches,C011,Baked grain bread,exact
+tortilla chip,grains_starches,C083,Cooked grain product,normalized_alias
+tostada,grains_starches,C083,Cooked grain product,normalized_alias
+trix cereal,grains_starches,C032,Grain cereal,exact
+trout fillet,seafood,C027,Fish,exact
+truffle oil,fats_oils,C044,Cooking oil,exact
+tuna,seafood,C027,Fish,exact
+tuna steak,seafood,C027,Fish,exact
+turbinado sugar,sweeteners,C336,Sugar or sweetener (cooking state unspecified),exact
+turkey,poultry,C079,Poultry,exact
+turkey bacon,poultry,C178,Formed poultry product,exact
+turkey breast,poultry,C079,Poultry,exact
+turkey carcass,poultry,C179,Poultry stock bones,exact
+turkey leg,poultry,C079,Poultry,exact
+turkey sausage,poultry,C178,Formed poultry product,exact
+turnip,vegetables,C021,Vegetables,exact
+tzatziki,sauces_seasoning_liquids,C456,Cultured yogurt sauce,exact
+umeboshi vinegar,sauces_seasoning_liquids,C136,Brine,exact
+unsalted butter,dairy,C148,Dairy butter,exact
+unsweetened chocolate,baking_flavoring_ingredients,C024,Confectionery,exact
+unsweetened coconut,nuts_seeds,C062,Fruit,exact
+vanilla bean,baking_flavoring_ingredients,C023,Spice (cooking state inapplicable),exact
+vanilla extract,baking_flavoring_ingredients,C040,Flavoring or extract,exact
+vanilla frosting,baking_flavoring_ingredients,C024,Confectionery,exact
+vanilla ice cream,dairy,C149,Frozen dessert,exact
+vanilla powder,baking_flavoring_ingredients,C071,Ground spice,exact
+vanilla protein powder,baking_flavoring_ingredients,C198,Protein supplement powder,exact
+vanilla sugar,baking_flavoring_ingredients,C026,Sugar or sweetener (cooking state inapplicable),exact
+vanilla vodka,beverages_juices,C008,Alcoholic beverage,exact
+vanilla wafer,baking_flavoring_ingredients,C039,Baked grain cookie,exact
+vanilla wafer crumb,baking_flavoring_ingredients,C039,Baked grain cookie,normalized_alias
+vanilla yogurt,dairy,C093,Cultured dairy yogurt,exact
+veal,meat,C061,Beef,exact
+veal scallop,meat,C061,Beef,normalized_alias
+veal shoulder,meat,C061,Beef,exact
+vegan butter,fats_oils,C106,Solid butter or butter substitute,exact
+vegan worcestershire sauce,sauces_seasoning_liquids,C015,Sauce or dressing,exact
+vegetable bouillon,water_broth,C108,Bouillon concentrate,exact
+vegetable broth,water_broth,C102,Broth or stock,exact
+vegetable oil,fats_oils,C044,Cooking oil,exact
+vegetable seasoning,spices_seasonings,C023,Spice (cooking state inapplicable),exact
+vegetables,vegetables,C021,Vegetables,exact
+venison,meat,C035,Meat,exact
+venison roast,meat,C035,Meat,exact
+vermouth,beverages_juices,C008,Alcoholic beverage,exact
+vinaigrette,sauces_seasoning_liquids,C015,Sauce or dressing,exact
+vindaloo curry paste,sauces_seasoning_liquids,C018,Seasoning paste,exact
+vinegar,sauces_seasoning_liquids,C017,Fermented vinegar,exact
+vodka,beverages_juices,C008,Alcoholic beverage,exact
+vodka sauce,sauces_seasoning_liquids,C015,Sauce or dressing,exact
+walnut,nuts_seeds,C042,Nuts and seeds,normalized_alias
+walnut oil,fats_oils,C044,Cooking oil,exact
+wasabi,vegetables,C307,Spice (cooking state unspecified),exact
+wasabi powder,vegetables,C071,Ground spice,exact
+water,water_broth,C131,Water,exact
+water chestnut,vegetables,C021,Vegetables,exact
+watercress,vegetables,C021,Vegetables,exact
+watermelon slice candy,baking_flavoring_ingredients,,,name_only
+wax bean,legumes,C021,Vegetables,exact
+wheat bran,grains_starches,C009,Grain products,exact
+wheat flake,grains_starches,C009,Grain products,normalized_alias
+wheat flour,grains_starches,C034,Milled grain flour,exact
+wheat germ,grains_starches,C009,Grain products,exact
+whipped cream,dairy,C004,Dairy cream,exact
+whipped topping,composite_processed_foods,C051,Cream or creamer,exact
+whiskey,beverages_juices,C008,Alcoholic beverage,exact
+white bean,legumes,C010,Legumes,normalized_alias
+white bread,grains_starches,C011,Baked grain bread,exact
+white cake mix,grains_starches,C058,Grain-based dry mix,exact
+white candy coating,baking_flavoring_ingredients,C024,Confectionery,exact
+white chocolate,baking_flavoring_ingredients,C024,Confectionery,exact
+white chocolate chip,baking_flavoring_ingredients,C024,Confectionery,normalized_alias
+white fish fillet,seafood,C027,Fish,exact
+white horseradish,spices_seasonings,C021,Vegetables,exact
+white onion,vegetables,C021,Vegetables,exact
+white pepper,spices_seasonings,C023,Spice (cooking state inapplicable),exact
+white rice,grains_starches,C007,Grain kernels,exact
+white vinegar,sauces_seasoning_liquids,C017,Fermented vinegar,exact
+white wine,beverages_juices,C029,Fermented alcoholic beverage,exact
+white wine vinegar,sauces_seasoning_liquids,C017,Fermented vinegar,exact
+whole chicken,poultry,C079,Poultry,exact
+whole clove,spices_seasonings,C023,Spice (cooking state inapplicable),normalized_alias
+whole grain bagel,grains_starches,C011,Baked grain bread,exact
+whole grain bread,grains_starches,C011,Baked grain bread,exact
+whole grain mustard,sauces_seasoning_liquids,C015,Sauce or dressing,exact
+whole wheat bread,grains_starches,C011,Baked grain bread,exact
+whole wheat breadcrumb,grains_starches,C139,Crumbs from baked grain bread,normalized_alias
+whole wheat flour,grains_starches,C034,Milled grain flour,exact
+whole wheat hoagie roll,grains_starches,C011,Baked grain bread,normalized_alias
+whole wheat pancake mix,grains_starches,C058,Grain-based dry mix,exact
+whole wheat pasta,grains_starches,C020,Grain noodles or pasta,exact
+whole wheat pastry flour,grains_starches,C034,Milled grain flour,exact
+whole wheat penne,grains_starches,C020,Grain noodles or pasta,exact
+whole wheat pita bread,grains_starches,C011,Baked grain bread,exact
+whole wheat spaghetti,grains_starches,C020,Grain noodles or pasta,exact
+whole wheat tortilla,grains_starches,C011,Baked grain bread,exact
+wild mushroom,vegetables,C124,Mushrooms,exact
+wild rice,grains_starches,C007,Grain kernels,exact
+wine,beverages_juices,C029,Fermented alcoholic beverage,exact
+wine vinegar,sauces_seasoning_liquids,C017,Fermented vinegar,exact
+winter squash,vegetables,C021,Vegetables,exact
+wonton wrapper,grains_starches,C054,Uncooked grain product,exact
+worcestershire sauce,sauces_seasoning_liquids,C015,Sauce or dressing,exact
+xanthan gum,grains_starches,C025,Gelling agent,exact
+yakisoba sauce,sauces_seasoning_liquids,C015,Sauce or dressing,exact
+yam,vegetables,C072,Starchy roots and tubers,exact
+yeast,leavening_agents,C262,Leavener (cooking state unspecified),exact
+yellow bell pepper,vegetables,C021,Vegetables,exact
+yellow cake mix,grains_starches,C058,Grain-based dry mix,exact
+yellow mustard,sauces_seasoning_liquids,C015,Sauce or dressing,exact
+yellow onion,vegetables,C021,Vegetables,exact
+yellow split pea,legumes,C010,Legumes,normalized_alias
+yellow squash,vegetables,C021,Vegetables,exact
+yukon gold potato,vegetables,C072,Starchy roots and tubers,exact
+ziti pasta,grains_starches,C020,Grain noodles or pasta,exact
+zucchini,vegetables,C021,Vegetables,exact

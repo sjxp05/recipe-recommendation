@@ -1,0 +1,26 @@
+{
+  "settings": {
+    "aggregator": "gru",
+    "gru_order": "shuffle",
+    "num_layers": 3,
+    "lr": 0.1,
+    "epochs": 100,
+    "folds": 5,
+    "val_ratio": 0.15,
+    "seed": 42,
+    "device": "cuda"
+  },
+  "final_train_loss": 0.0040332358330488205,
+  "best_val_epoch": 97,
+  "parameters": 257986,
+  "val": {
+    "n": 2499,
+    "mae": 0.041933443397283554,
+    "rmse": 0.0692504495382309
+  },
+  "test": {
+    "n": 2939,
+    "mae": 0.040188636630773544,
+    "rmse": 0.06499778479337692
+  }
+}
