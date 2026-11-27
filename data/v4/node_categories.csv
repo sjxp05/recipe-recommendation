@@ -16,7 +16,6 @@ almond joy candy bar,baking_flavoring_ingredients,C024,Confectionery,normalized_
 almond milk,beverages_juices,C037,Nut or seed milk,exact
 almond paste,nuts_seeds,C045,Nut or seed paste,exact
 alphabet pasta,grains_starches,C020,Grain noodles or pasta,exact
-aluminum foil,,C049,Nonfood kitchen supplies,exact
 amaretto liqueur,beverages_juices,C008,Alcoholic beverage,exact
 american cheese,dairy,C002,Dairy cheese,exact
 ancho chili powder,spices_seasonings,C052,Dried ground spice,normalized_alias
@@ -66,8 +65,6 @@ baking powder,leavening_agents,C091,Powdered leavener,exact
 baking soda,leavening_agents,C089,Leavener (cooking state inapplicable),exact
 balsamic vinegar,sauces_seasoning_liquids,C017,Fermented vinegar,exact
 bamboo shoot,vegetables,C021,Vegetables,exact
-bamboo skewer,,C049,Nonfood kitchen supplies,exact
-bamboo skewers,,C049,Nonfood kitchen supplies,exact
 banana,fruits,C062,Fruit,exact
 banana extract,baking_flavoring_ingredients,C040,Flavoring or extract,exact
 banana yogurt,dairy,C093,Cultured dairy yogurt,exact
@@ -200,7 +197,6 @@ catfish nugget,seafood,C027,Fish,normalized_alias
 cauliflower,vegetables,C021,Vegetables,exact
 caviar,seafood,C122,Seafood,exact
 cayenne pepper,spices_seasonings,C023,Spice (cooking state inapplicable),exact
-cedar plank,,C049,Nonfood kitchen supplies,exact
 celeriac,vegetables,C021,Vegetables,exact
 celery,vegetables,C021,Vegetables,exact
 celery salt,spices_seasonings,C126,Salt,exact
@@ -217,7 +213,6 @@ cheese ravioli,grains_starches,C172,Grain pasta with cheese,exact
 cheese sauce,sauces_seasoning_liquids,C015,Sauce or dressing,exact
 cheese slice,dairy,C002,Dairy cheese,exact
 cheese tortellini,grains_starches,C172,Grain pasta with cheese,exact
-cheesecloth,,C049,Nonfood kitchen supplies,exact
 cherry,fruits,C062,Fruit,normalized_alias
 cherry brandy,beverages_juices,C008,Alcoholic beverage,exact
 cherry pepper,vegetables,C021,Vegetables,exact
@@ -465,7 +460,7 @@ fresh ginger,spices_seasonings,C023,Spice (cooking state inapplicable),exact
 fresh mozzarella cheese,dairy,C002,Dairy cheese,exact
 fresh yeast,leavening_agents,C262,Leavener (cooking state unspecified),exact
 frosting,baking_flavoring_ingredients,C024,Confectionery,exact
-frozen peppers and onions,,C021,Vegetables,exact
+frozen peppers and onions,vegetables,C021,Vegetables,exact
 fruit,fruits,C062,Fruit,exact
 fruit bread,grains_starches,C011,Baked grain bread,exact
 fruit chutney,sauces_seasoning_liquids,C076,Fruit sauce,exact
@@ -629,7 +624,7 @@ kidney bean,legumes,C010,Legumes,exact
 kielbasa,meat,C036,Formed meat product,exact
 kiwi fruit,fruits,C062,Fruit,exact
 kosher salt,spices_seasonings,C126,Salt,exact
-kosher salt & freshly ground black pepper,,C353,Spiced salt,exact
+kosher salt & freshly ground black pepper,spices_seasonings,C353,Spiced salt,exact
 kudzu,grains_starches,C350,Isolated root starch,exact
 ladyfinger,grains_starches,C039,Baked grain cookie,exact
 lamb,meat,C132,"Lamb, mutton or goat meat",exact
@@ -651,7 +646,7 @@ lemon juice,beverages_juices,C047,Juice,exact
 lemon pepper seasoning,spices_seasonings,C023,Spice (cooking state inapplicable),exact
 lemon thyme,spices_seasonings,C060,Herbs,exact
 lemon zest,fruits,C062,Fruit,exact
-"lemon, juice and zest of",,C359,Fruit with its juice,exact
+"lemon, juice and zest of",fruits,C359,Fruit with its juice,exact
 lemon-lime soda,beverages_juices,C012,Beverage,normalized_alias
 lemonade,beverages_juices,C012,Beverage,exact
 lemonade concentrate,beverages_juices,C153,Beverage concentrate,exact
@@ -664,8 +659,8 @@ lima bean,legumes,C010,Legumes,normalized_alias
 lime,fruits,C062,Fruit,exact
 lime juice,beverages_juices,C047,Juice,exact
 lime zest,fruits,C062,Fruit,exact
-"lime, juice and zest of",,C359,Fruit with its juice,exact
-"limes, juice and zest of",,C359,Fruit with its juice,exact
+"lime, juice and zest of",fruits,C359,Fruit with its juice,exact
+"limes, juice and zest of",fruits,C359,Fruit with its juice,exact
 linguine,grains_starches,C020,Grain noodles or pasta,exact
 liquid,,,,name_only
 liquid aminos,sauces_seasoning_liquids,C015,Sauce or dressing,normalized_alias
@@ -781,9 +776,9 @@ orange juice,beverages_juices,C047,Juice,exact
 orange juice concentrate,beverages_juices,C065,Juice concentrate,exact
 orange liqueur,beverages_juices,C008,Alcoholic beverage,exact
 orange zest,fruits,C062,Fruit,exact
-"orange, juice and zest of",,C359,Fruit with its juice,exact
+"orange, juice and zest of",fruits,C359,Fruit with its juice,exact
 orange-infused vodka,beverages_juices,C008,Alcoholic beverage,exact
-"oranges, juice and zest of",,C359,Fruit with its juice,exact
+"oranges, juice and zest of",fruits,C359,Fruit with its juice,exact
 oregano,spices_seasonings,C060,Herbs,exact
 orzo pasta,grains_starches,C020,Grain noodles or pasta,exact
 ox tongue,meat,C112,Beef offal,exact
@@ -794,7 +789,6 @@ pancake mix,grains_starches,C058,Grain-based dry mix,exact
 pancetta,meat,C077,Pork,exact
 panko breadcrumb,grains_starches,C139,Crumbs from baked grain bread,normalized_alias
 papaya,fruits,C062,Fruit,exact
-paper baking cups,,C049,Nonfood kitchen supplies,exact
 paprika,spices_seasonings,C023,Spice (cooking state inapplicable),exact
 parboiled rice,grains_starches,C222,Dried grain kernels,exact
 parmesan cheese,dairy,C002,Dairy cheese,exact
@@ -855,7 +849,6 @@ pizza dough,grains_starches,C097,Unbaked grain bread dough,exact
 pizza sauce,sauces_seasoning_liquids,C015,Sauce or dressing,exact
 plain yogurt,dairy,C093,Cultured dairy yogurt,exact
 plantain,fruits,C062,Fruit,exact
-plastic wrap,,C049,Nonfood kitchen supplies,exact
 plum,fruits,C062,Fruit,exact
 poblano pepper,vegetables,C021,Vegetables,exact
 polenta,grains_starches,C009,Grain products,exact
@@ -986,12 +979,12 @@ salmon steak,seafood,C027,Fish,exact
 salsa,sauces_seasoning_liquids,C015,Sauce or dressing,exact
 salsa verde,sauces_seasoning_liquids,C015,Sauce or dressing,exact
 salt,spices_seasonings,C126,Salt,exact
-salt & fresh ground pepper,,C353,Spiced salt,exact
-salt & freshly ground black pepper,,C353,Spiced salt,exact
-salt & pepper,,C353,Spiced salt,exact
-salt and black pepper,,C353,Spiced salt,exact
-salt and pepper,,C353,Spiced salt,exact
-salt water,,C136,Brine,exact
+salt & fresh ground pepper,spices_seasonings,C353,Spiced salt,exact
+salt & freshly ground black pepper,spices_seasonings,C353,Spiced salt,exact
+salt & pepper,spices_seasonings,C353,Spiced salt,exact
+salt and black pepper,spices_seasonings,C353,Spiced salt,exact
+salt and pepper,spices_seasonings,C353,Spiced salt,exact
+salt water,water_broth,C136,Brine,exact
 salt-free herb seasoning,spices_seasonings,C023,Spice (cooking state inapplicable),normalized_alias
 saltine cracker,grains_starches,C105,Baked grain crackers,normalized_alias
 saltine crumb,grains_starches,C105,Baked grain crackers,normalized_alias

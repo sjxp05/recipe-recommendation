@@ -28,11 +28,12 @@ from src.engine import (
 from training.stage1 import _context_edges
 
 # 1단계(stage1_rebuild) 입력 데이터와 학습된 체크포인트: 읽기 전용
-STAGE1_EMBEDDINGS = Path("data/stage1_rebuild_raw_gte.pt")
+STAGE1_EMBEDDINGS = Path("data/v4/stage1_rebuild_raw_gte.pt")
 STAGE1_CHECKPOINT = Path("checkpoints/stage1_rebuild_raw_gte_h64.pt")
-# 새 1단계 기준으로 다시 만드는 2단계 산출물: 기존 파일을 덮어쓰지 않도록 tmp/에 저장
+# 2단계 재료 임베딩 + 기여도 분할 (training.stage2 prepare 결과)
+STAGE2_EMBEDDINGS = Path("data/v4/stage2_embeddings.pt")
+# 2단계 학습 체크포인트: 기존 파일을 덮어쓰지 않도록 tmp/에 저장
 OUTPUT_DIR = Path("tmp")
-STAGE2_EMBEDDINGS = OUTPUT_DIR / "stage2_embeddings.pt"
 STAGE2_CHECKPOINT = OUTPUT_DIR / "stage2.pt"
 
 ContributionRow = tuple[str, str, float]  # (원본 레시피 ID, 재료 이름, 기여도)
@@ -50,7 +51,10 @@ def read_ingredients(
     """재료 노드 목록(이름, 카테고리)을 반환. 카테고리 CSV에 없는 재료의 카테고리는 빈 문자열"""
     categories: dict[str, str] = {}
     for row in _read_csv(category_path):
-        name, category = _normalize_name(row["ingredient"]), row["category"].strip()
+        name, category = (
+            _normalize_name(row["ingredient"]),
+            row["original_category"].strip(),
+        )
         if not name or not category:
             raise ValueError(f"empty ingredient or category in {category_path}")
         if categories.setdefault(name, category) != category:

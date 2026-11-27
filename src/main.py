@@ -39,7 +39,7 @@ from training.data import (
     set_contributions,
 )
 
-RECIPES_CSV = Path("data/stage1/v3/recipes_masked_v3.csv")
+RECIPES_CSV = Path("data/v4/recipes_raw_v4.csv")
 
 
 class Quit(Exception):

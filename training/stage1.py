@@ -9,7 +9,7 @@
 
 실행 예:
     python -m training.stage1 select --source ../RAW_recipes_normalized.csv
-    python -m training.stage1 prepare --recipes data/recipes_raw_v3.csv --output tmp/stage1_raw_gte.pt
+    python -m training.stage1 prepare --recipes data/v4/recipes_raw_v4.csv --output tmp/stage1_raw_gte.pt
     python -m training.stage1 train --data tmp/stage1_raw_gte.pt --out tmp/stage1
 """
 
@@ -28,8 +28,8 @@ from torch.nn import functional as F
 
 from src.engine import CONTRIBUTION_CSV, RecipePairGraphSAGE, sha256
 
-SELECTED_RECIPES = Path("data/recipes_raw_v3.csv")
-PAIRS_CSV = Path("data/labeled_pairs_masked_v3.csv")
+SELECTED_RECIPES = Path("data/v4/recipes_raw_v4.csv")
+PAIRS_CSV = Path("data/v4/labeled_pairs_masked_v4.csv")
 OUTPUT = Path("tmp/stage1_raw_gte.pt")
 COLUMNS = ("id", "name", "steps", "ingredients")
 THRESHOLDS = (0.2, 0.4, 0.6, 0.8)  # 0~1 유사도에서 0/1/2/3/4점을 나누는 경계

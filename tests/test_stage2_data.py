@@ -28,7 +28,7 @@ class Stage2DataTests(unittest.TestCase):
         self.directory = Path(directory.name)
         self.categories = self._write(
             "category.csv",
-            "category,ingredient\n"
+            "original_category,ingredient\n"
             "dairy,milk\n"
             "dairy,Butter\n"
             "grains_starches,flour\n"
@@ -88,8 +88,19 @@ class Stage2DataTests(unittest.TestCase):
         )
         self.assertEqual(ingredient_text("salt and pepper", ""), "Ingredient: salt and pepper.")
 
+    def test_empty_original_category_means_uncategorized(self):
+        path = self._write(
+            "node_categories.csv",
+            "ingredient,original_category,new_category_ids,new_category_text,source\n"
+            "milk,dairy,C001,Dairy milk,exact\n"
+            "salt and pepper,,C051,Salt,exact\n",
+        )
+        names, categories = read_ingredients(path, self.contributions)
+        self.assertEqual(names, ["butter", "flour", "milk", "salt and pepper"])
+        self.assertEqual(categories, ["", "", "dairy", ""])
+
     def test_conflicting_category_is_rejected(self):
-        path = self._write("bad.csv", "category,ingredient\ndairy,milk\nbeverages_juices,Milk\n")
+        path = self._write("bad.csv", "original_category,ingredient\ndairy,milk\nbeverages_juices,Milk\n")
         with self.assertRaisesRegex(ValueError, "two categories"):
             read_ingredients(path, self.contributions)
 

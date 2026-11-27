@@ -30,9 +30,9 @@ REV_CONTRIBUTION = ("Ingredient", "REV_CONTRIBUTION", "Recipe")
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-DATA_DIR = Path(__file__).resolve().parents[1] / "data"
+DATA_DIR = Path(__file__).resolve().parents[1] / "data" / "v4"
 CONTRIBUTION_CSV = DATA_DIR / "ingredients_contribution.csv"
-CATEGORY_CSV = DATA_DIR / "ingredients_category.csv"
+CATEGORY_CSV = DATA_DIR / "node_categories.csv"
 
 
 def _normalize_name(name: str) -> str:
@@ -69,11 +69,12 @@ def recipes_with_ingredient(
 
 @lru_cache(maxsize=None)
 def _read_categories(path: str) -> dict[str, str]:
-    # 재료 이름 -> 카테고리
+    # 재료 이름 -> 카테고리 (original_category가 빈 재료는 카테고리 없음으로 제외)
     with open(path, newline="", encoding="utf-8-sig") as file:
         return {
-            _normalize_name(row["ingredient"]): row["category"].strip()
+            _normalize_name(row["ingredient"]): row["original_category"].strip()
             for row in csv.DictReader(file)
+            if row["original_category"].strip()
         }
 
 
@@ -544,7 +545,7 @@ class IngredientLinkEncoder(nn.Module):
     ) -> tuple[Tensor, Tensor]:
         """ingredient_id 재료가 실제로 들어가는 레시피 중 recipe_id와 유사한 순으로 반환
 
-        후보는 기여도 CSV(data/ingredients_contribution.csv)에 연결된 레시피로 한정하며 기준 레시피는 제외함
+        후보는 기여도 CSV(data/v4/ingredients_contribution.csv)에 연결된 레시피로 한정하며 기준 레시피는 제외함
         recipe_model(1단계 모델)을 주면 학습된 쌍 유사도(0~1)로, 없으면 임베딩 코사인 유사도로 순위를 매김
         (recipe_embeddings는 recipe_model(data)의 정규화하지 않은 출력이어야 함)
 
