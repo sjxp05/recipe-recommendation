@@ -27,6 +27,7 @@ from src.engine import (
     DEVICE,
     IngredientLinkEncoder,
     RecipePairGraphSAGE,
+    load_ingredient_model,
     load_recipe_model,
 )
 from training.data import (
@@ -114,9 +115,10 @@ def load_app(args: argparse.Namespace) -> App:
         raise SystemExit(
             "1단계와 2단계 체크포인트의 hidden 크기가 다릅니다 (2단계를 다시 학습하세요)"
         )
-    model = IngredientLinkEncoder(stage2["ingredient_features"], stage2["hidden"]).to(DEVICE)
-    model.load_state_dict(stage2["model"])
-    model.eval()
+    try:
+        model = load_ingredient_model(stage2).to(DEVICE).eval()
+    except ValueError as error:
+        raise SystemExit(f"2단계 체크포인트를 쓸 수 없습니다: {error}")
     with torch.no_grad():
         recipe_embeddings = recipe_model(data)
 

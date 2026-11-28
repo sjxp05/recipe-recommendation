@@ -55,8 +55,10 @@ def read_ingredients(
             _normalize_name(row["ingredient"]),
             row["original_category"].strip(),
         )
-        if not name or not category:
-            raise ValueError(f"empty ingredient or category in {category_path}")
+        if not name:
+            raise ValueError(f"empty ingredient in {category_path}")
+        if not category:
+            continue  # original_category가 빈 재료는 카테고리 없음으로 처리
         if categories.setdefault(name, category) != category:
             raise ValueError(f"ingredient has two categories: {name}")
     names = set(categories)

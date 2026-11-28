@@ -49,9 +49,10 @@ def train(
     recipe_model,
     *,
     epochs: int = 100,
-    lr: float = 0.01,
+    lr: float = 0.001,
     folds: int = 5,
     seed: int = 42,
+    num_layers: int = 2,
 ):
     if epochs < 1 or lr <= 0 or folds < 1:
         raise ValueError("epochs, lr and folds must be positive")
@@ -62,8 +63,10 @@ def train(
         recipe_embeddings = recipe_model(data).detach()
     # 레시피 임베딩과 같은 장치(GPU/CPU)에서 학습
     device = recipe_embeddings.device
+    # 초기 가중치를 시드로 고정 (CPU에서 초기화한 뒤 옮기므로 장치와 무관하게 같은 초기값)
+    torch.manual_seed(seed)
     model = IngredientLinkEncoder(
-        data["Ingredient"].x.shape[1], recipe_embeddings.shape[1]
+        data["Ingredient"].x.shape[1], recipe_embeddings.shape[1], num_layers
     ).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
@@ -141,11 +144,13 @@ def train_command(args: argparse.Namespace) -> None:
         lr=args.lr,
         folds=args.folds,
         seed=args.seed,
+        num_layers=args.num_layers,
     )
     checkpoint = {
         # GPU가 없는 환경에서도 읽을 수 있도록 CPU 텐서로 저장
         "model": {k: v.cpu() for k, v in model.state_dict().items()},
         "hidden": hidden,
+        "num_layers": model.num_layers,
         "ingredient_features": data["Ingredient"].x.shape[1],
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)
@@ -174,7 +179,8 @@ def main() -> None:
     train_parser.add_argument("--output", type=Path, default=STAGE2_CHECKPOINT)
     train_parser.add_argument("--epochs", type=int, default=100)
     train_parser.add_argument("--folds", type=int, default=5)
-    train_parser.add_argument("--lr", type=float, default=0.01)
+    train_parser.add_argument("--lr", type=float, default=0.001)
+    train_parser.add_argument("--num-layers", type=int, default=2)
     train_parser.add_argument("--seed", type=int, default=42)
 
     args = parser.parse_args()

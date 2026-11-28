@@ -378,7 +378,7 @@ def load_recipe_model(
 
 
 class WeightedSAGEConv(nn.Module):
-    # 이웃 메시지에 엣지 가중치를 곱한 뒤 이웃 수로 나누는 GraphSAGE 계층
+    # 이웃 메시지에 엣지 가중치를 곱한 뒤 이웃 수로 나누는 GraphSAGE 계층 (training/stage1_backup.py에서 사용)
     def __init__(self, hidden: int):
         super().__init__()
         self.source = nn.Linear(hidden, hidden, bias=False)
@@ -396,46 +396,111 @@ class WeightedSAGEConv(nn.Module):
         return self.target(target) + self.source(neighbors / counts.clamp_min(1))
 
 
+def load_ingredient_model(checkpoint: dict) -> "IngredientLinkEncoder":
+    """training.stage2 train이 저장한 체크포인트(dict)로 2단계 모델을 만들어 가중치를 불러옴"""
+    if "num_layers" not in checkpoint:
+        raise ValueError(
+            "GRU 집계 이전 형식의 2단계 체크포인트입니다 (python -m training.stage2 train으로 다시 학습하세요)"
+        )
+    model = IngredientLinkEncoder(
+        checkpoint["ingredient_features"], checkpoint["hidden"], checkpoint["num_layers"]
+    )
+    model.load_state_dict(checkpoint["model"])
+    return model
+
+
+class GRUSAGEConv(nn.Module):
+    # 이웃을 GRU로 모으는 GraphSAGE 계층
+    #   - 도착 노드마다 이웃 (출발 노드 벡터, 엣지 가중치)를 엣지 목록 순서대로 GRU에 넣고 마지막 상태를 이웃 메시지로 사용
+    #   - 이웃 순서는 섞지 않음 (stage2_graph_experiments의 gru, gru_order="fixed"와 같은 계산)
+    #   - 이웃이 없는 노드의 이웃 메시지는 0 벡터
+    def __init__(self, hidden: int):
+        super().__init__()
+        self.source = nn.Linear(hidden, hidden, bias=False)
+        self.target = nn.Linear(hidden, hidden)
+        self.gru = nn.GRU(hidden + 1, hidden, batch_first=True)
+
+    def aggregate(
+        self, source: Tensor, target: Tensor, edges: Tensor, weights: Tensor
+    ) -> Tensor:
+        if not edges.numel():
+            return torch.zeros_like(target)
+        # 도착 노드별로 엣지를 모으되, 같은 노드 안에서는 엣지 목록 순서를 유지
+        order = torch.argsort(edges[1], stable=True)
+        src, dst, weights = edges[0, order], edges[1, order], weights[order]
+        nodes, counts = torch.unique_consecutive(dst, return_counts=True)
+        starts = torch.cumsum(counts, 0) - counts
+        rows = torch.repeat_interleave(torch.arange(len(nodes), device=dst.device), counts)
+        positions = torch.arange(len(dst), device=dst.device) - torch.repeat_interleave(
+            starts, counts
+        )
+        sequences = source.new_zeros(len(nodes), int(counts.max()), source.shape[1] + 1)
+        sequences[rows, positions] = torch.cat((source[src], weights[:, None]), dim=1)
+        packed = nn.utils.rnn.pack_padded_sequence(
+            sequences, counts.cpu(), batch_first=True, enforce_sorted=False
+        )
+        _, state = self.gru(packed)
+        return torch.zeros_like(target).index_copy(0, nodes, state[-1])
+
+    def forward(
+        self, source: Tensor, target: Tensor, edges: Tensor, weights: Tensor
+    ) -> Tensor:
+        return self.target(target) + self.source(
+            self.aggregate(source, target, edges, weights)
+        )
+
+
 class IngredientLinkEncoder(nn.Module):
     # 2단계: 단일 CONTRIBUTION 관계에서 0~1 기여도를 회귀
     #   - 1단계 인코더에서 고정된 레시피 임베딩 사용
     #   - 연결이 없는 재료도 자기 노드 경로를 통해 재료 특징으로 임베딩 생성
+    #   - 레이어 l마다 (레시피 -> 재료) conv와 (재료 -> 레시피) reverse conv를 한 번씩 적용
+    #       재료_l   = conv_l(레시피_{l-1} -> 재료_{l-1})            (마지막 레이어가 아니면 ReLU)
+    #       레시피_l = 레시피_{l-1} + reverse_conv_l(재료_{l-1} -> 레시피_{l-1})   (residual)
 
-    def __init__(self, ingredient_features: int, hidden: int = 32):
+    def __init__(self, ingredient_features: int, hidden: int = 32, num_layers: int = 2):
         super().__init__()
+        if num_layers < 1:
+            raise ValueError("num_layers must be at least 1")
         self.input = nn.Linear(ingredient_features, hidden)
-        self.conv = WeightedSAGEConv(hidden)
-        self.reverse_conv = WeightedSAGEConv(hidden)
+        self.convs = nn.ModuleList()
+        self.reverse_convs = nn.ModuleList()
+        for _ in range(num_layers):
+            self.convs.append(GRUSAGEConv(hidden))
+            self.reverse_convs.append(GRUSAGEConv(hidden))
         self.recipe_head = nn.Linear(hidden, hidden)
         self.ingredient_head = nn.Linear(hidden, hidden)
         self.logit_scale = nn.Parameter(torch.tensor(2.0))
         self.bias = nn.Parameter(torch.tensor(0.0))
 
-    def encode_ingredients(self, data: HeteroData, recipe_embeddings: Tensor) -> Tensor:
-        ingredient_x = F.relu(self.input(data["Ingredient"].x))
-        store = data[CONTRIBUTION]
+    @property
+    def num_layers(self) -> int:
+        return len(self.convs)
+
+    @staticmethod
+    def _observed(store) -> tuple[Tensor, Tensor]:
+        # 모델이 예측해 추가한 연결은 메시지 전달에서 제외
         mask = ~store.is_predicted.bool() if "is_predicted" in store else slice(None)
-        return F.normalize(
-            self.conv(
-                recipe_embeddings,
-                ingredient_x,
-                store.edge_index[:, mask],
-                store.edge_weight[mask],
-            ),
-            dim=-1,
-        )
+        return store.edge_index[:, mask], store.edge_weight[mask]
+
+    def encode(self, data: HeteroData, recipe_embeddings: Tensor) -> tuple[Tensor, Tensor]:
+        """(정규화된 레시피 임베딩, 정규화된 재료 임베딩)을 반환"""
+        edges, weights = self._observed(data[CONTRIBUTION])
+        reverse, reverse_weights = self._observed(data[REV_CONTRIBUTION])
+        ingredients = F.relu(self.input(data["Ingredient"].x))
+        recipes = recipe_embeddings
+        for index, (conv, reverse_conv) in enumerate(zip(self.convs, self.reverse_convs)):
+            next_ingredients = conv(recipes, ingredients, edges, weights)
+            recipes = recipes + reverse_conv(ingredients, recipes, reverse, reverse_weights)
+            last = index == self.num_layers - 1
+            ingredients = next_ingredients if last else F.relu(next_ingredients)
+        return F.normalize(recipes, dim=-1), F.normalize(ingredients, dim=-1)
+
+    def encode_ingredients(self, data: HeteroData, recipe_embeddings: Tensor) -> Tensor:
+        return self.encode(data, recipe_embeddings)[1]
 
     def encode_recipes(self, data: HeteroData, recipe_embeddings: Tensor) -> Tensor:
-        ingredient_x = F.relu(self.input(data["Ingredient"].x))
-        store = data[REV_CONTRIBUTION]
-        mask = ~store.is_predicted.bool() if "is_predicted" in store else slice(None)
-        neighbor_messages = self.reverse_conv(
-            ingredient_x,
-            recipe_embeddings,
-            store.edge_index[:, mask],
-            store.edge_weight[mask],
-        )
-        return F.normalize(recipe_embeddings + neighbor_messages, dim=-1)
+        return self.encode(data, recipe_embeddings)[0]
 
     def score(
         self,
@@ -444,8 +509,7 @@ class IngredientLinkEncoder(nn.Module):
         pairs: Tensor,
     ) -> Tensor:
         _check_pairs(pairs, len(recipe_embeddings), data["Ingredient"].num_nodes)
-        ingredients = self.encode_ingredients(data, recipe_embeddings)
-        recipes = self.encode_recipes(data, recipe_embeddings)
+        recipes, ingredients = self.encode(data, recipe_embeddings)
         recipe = F.normalize(self.recipe_head(recipes[pairs[0]]), dim=-1)
         ingredient = F.normalize(self.ingredient_head(ingredients[pairs[1]]), dim=-1)
         return (recipe * ingredient).sum(-1) * self.logit_scale.exp().clamp(

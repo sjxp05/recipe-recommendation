@@ -11,9 +11,11 @@ from src.engine import (
     REV_CONTRIBUTION,
     SIMILAR,
     IngredientLinkEncoder,
+    GRUSAGEConv,
     RecipePairGraphSAGE,
     WeightedSAGEConv,
     find_recipes_by_ingredient,
+    load_ingredient_model,
     load_recipe_model,
     sha256,
 )
@@ -151,7 +153,7 @@ class EngineTests(unittest.TestCase):
         torch.manual_seed(7)
         data, targets = toy_dataset()
         recipes = train_toy_recipe_encoder(data)
-        ingredients, _ = train(data, targets, recipes, epochs=35)
+        ingredients, _ = train(data, targets, recipes, epochs=35, lr=0.01)  # 장난감 그래프용 학습률
 
         self.assertTrue(
             all(not parameter.requires_grad for parameter in recipes.parameters())
@@ -199,7 +201,7 @@ class EngineTests(unittest.TestCase):
         data, targets = toy_dataset()
 
         recipes = train_toy_recipe_encoder(data)
-        ingredients, _ = train(data, targets, recipes, epochs=35)
+        ingredients, _ = train(data, targets, recipes, epochs=35, lr=0.01)  # 장난감 그래프용 학습률
         data["Ingredient"].x = torch.cat(
             (data["Ingredient"].x, data["Ingredient"].x[0:1])
         )
@@ -540,6 +542,41 @@ class EngineTests(unittest.TestCase):
         zero = conv(source, target, edges, torch.zeros(2))
         self.assertTrue(torch.equal(zero, target))
 
+    def test_gru_conv_reads_neighbors_in_edge_order(self):
+        torch.manual_seed(0)
+        conv = GRUSAGEConv(2)
+        source = torch.tensor([[1.0, 2.0], [3.0, 4.0]])
+        target = torch.tensor([[0.5, -0.5], [1.0, 1.0]])
+        edges = torch.tensor([[0, 1], [0, 0]])  # 0번 노드의 이웃 2개, 1번 노드는 이웃 없음
+        weights = torch.tensor([0.25, 1.0])
+        with torch.no_grad():
+            actual = conv(source, target, edges, weights)
+            _, state = conv.gru(torch.cat((source, weights[:, None]), dim=1)[None])
+            expected = conv.target(target[:1]) + conv.source(state[-1])
+            self.assertTrue(torch.allclose(actual[:1], expected, atol=1e-6))
+            self.assertTrue(torch.allclose(actual[1:], conv.target(target[1:])))
+            # 이웃 순서와 엣지 가중치가 메시지에 반영됨
+            flipped = conv(source, target, edges.flip(1), weights.flip(0))
+            self.assertFalse(torch.allclose(flipped[:1], actual[:1]))
+            self.assertFalse(torch.allclose(conv(source, target, edges, torch.zeros(2)), actual))
+            empty = conv(source, target, torch.empty((2, 0), dtype=torch.long), torch.empty(0))
+            self.assertTrue(torch.allclose(empty, conv.target(target)))
+
+    def test_ingredient_model_checkpoint_round_trip(self):
+        torch.manual_seed(0)
+        model = IngredientLinkEncoder(3, 8, num_layers=2)
+        self.assertEqual(model.num_layers, 2)
+        checkpoint = {
+            "model": model.state_dict(), "hidden": 8, "num_layers": 2, "ingredient_features": 3,
+        }
+        loaded = load_ingredient_model(checkpoint)
+        for name, value in model.state_dict().items():
+            self.assertTrue(torch.equal(value, loaded.state_dict()[name]))
+        old = {key: value for key, value in checkpoint.items() if key != "num_layers"}
+        with self.assertRaisesRegex(ValueError, "다시 학습"):
+            load_ingredient_model(old)
+        with self.assertRaises(ValueError):
+            IngredientLinkEncoder(3, 8, num_layers=0)
 
 if __name__ == "__main__":
     unittest.main()
